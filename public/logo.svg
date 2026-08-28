@@ -1,0 +1,22 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="1200" height="1200" fill="white"/>
+<rect x="489.795" y="490.663" width="246.818" height="258.314" fill="#0B2842"/>
+<rect width="39.1212" height="41.0006" transform="matrix(2.4929 1.29675 -1.30342 2.48941 413.657 355.355)" fill="#0B2842"/>
+<rect width="31.0203" height="32.4952" transform="matrix(2.604 -1.05607 1.06201 2.60158 280 634.129)" fill="#0B2842"/>
+<rect width="20.8602" height="18.5818" transform="matrix(2.71335 -0.730648 0.735109 2.71214 281.893 520.575)" fill="#0B2842"/>
+<rect width="39.1366" height="40.9844" transform="matrix(2.67673 0.855125 -0.860205 2.6751 383.13 724.376)" fill="#0B2842"/>
+<rect width="28.1997" height="29.5389" transform="matrix(2.61758 -1.02194 1.02774 2.61531 520.648 839.299)" fill="#0B2842"/>
+<rect width="33.4089" height="37.8543" transform="matrix(2.61758 -1.02194 1.02774 2.61531 730.854 759.562)" fill="#0B2842"/>
+<rect width="33.672" height="28.3191" transform="matrix(2.65788 -0.912023 0.917364 2.65604 787.895 632.562)" fill="#0B2842"/>
+<rect width="33.678" height="34.266" transform="matrix(2.73777 0.633006 -0.636941 2.73686 758.439 386.107)" fill="#0B2842"/>
+<rect width="33.6649" height="34.2794" transform="matrix(2.56057 -1.15741 1.1637 2.55771 520.648 357.418)" fill="#0B2842"/>
+<rect width="24.6348" height="25.1467" transform="matrix(1.88857 -2.08072 2.08685 1.8818 639.541 335.258)" fill="#05A67C"/>
+<rect width="18.6929" height="21.4336" transform="matrix(0.839041 -2.68181 2.68336 0.834062 847.682 559.245)" fill="#05A67C"/>
+<rect width="27.3796" height="25.5214" transform="matrix(-0.71387 -2.71781 2.71895 -0.70952 398.569 618.734)" fill="#05A67C"/>
+<rect width="13.8392" height="13.645" transform="matrix(-1.69216 -2.24337 2.24866 -1.68511 667.475 886.867)" fill="#05A67C"/>
+<path d="M525.109 757.628L586.169 780.128L498.419 816.811L525.109 757.628Z" fill="#05A67C"/>
+<path d="M752.362 682.682L779.411 650.005L785.314 709.438L752.362 682.682Z" fill="#05A67C"/>
+<path d="M610.754 446.117L706.223 416.207L708.753 466.324L610.754 446.117Z" fill="#05A67C"/>
+<line y1="-2" x2="29.2062" y2="-2" transform="matrix(0.633817 2.73758 -2.73849 0.629899 761.295 521.415)" stroke="#0B2842" stroke-width="4"/>
+<line y1="-2" x2="11.8025" y2="-2" transform="matrix(-1.80028 2.15756 -2.16333 -1.79334 665.305 761.278)" stroke="#0B2842" stroke-width="4"/>
+</svg>
