@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Material de referência (design/copy/pesquisa) usado pra construir Home.jsx --
+# não é código, fica só localmente.
+invariant-investor-research.zip
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
