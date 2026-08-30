@@ -343,15 +343,33 @@ function TargetCard({ name, data, isDemo, onViewFindings }) {
   )
 }
 
+// Caps how many cards render up front instead of leaving it fully
+// data-dependent -- this page shows the latest *live* run, so target
+// count varies run to run, and reserving skeleton space for a moving
+// target was proving unreliable (see OverviewSkeleton). Capping the
+// initial render to the same count the skeleton shows makes the two
+// heights actually match instead of guessing at one of them.
+const TARGET_GRID_INITIAL_COUNT = 6
+
 function TargetGrid({ report, onViewFindings }) {
+  const [expanded, setExpanded] = useState(false)
   if (!report) return null
   const isDemo = report.is_demo ?? true
+  const visible = expanded ? report.targets : report.targets.slice(0, TARGET_GRID_INITIAL_COUNT)
+  const hiddenCount = report.targets.length - visible.length
   return (
-    <div className="card-grid">
-      {report.targets.map((name) => (
-        <TargetCard key={name} name={name} data={report.containers[name]} isDemo={isDemo} onViewFindings={onViewFindings} />
-      ))}
-    </div>
+    <>
+      <div className="card-grid">
+        {visible.map((name) => (
+          <TargetCard key={name} name={name} data={report.containers[name]} isDemo={isDemo} onViewFindings={onViewFindings} />
+        ))}
+      </div>
+      {hiddenCount > 0 && (
+        <button type="button" className="link-btn" onClick={() => setExpanded(true)}>
+          Show all {report.targets.length} targets ({hiddenCount} more)
+        </button>
+      )}
+    </>
   )
 }
 
@@ -451,13 +469,16 @@ function TargetDetail({ name, data, isDemo, onSelectFinding, onBack }) {
   )
 }
 
+const RECENT_FINDINGS_INITIAL_COUNT = 6
+
 function RecentFindings({ report, onSelectFinding }) {
+  const [expanded, setExpanded] = useState(false)
   if (!report) return null
   const isDemo = report.is_demo ?? true
   const source = (name) =>
     isDemo ? report.containers[name].story : [...report.containers[name].story, ...report.containers[name].unexplained]
-  const findings = byLevel(report.targets.flatMap(source))
-  if (findings.length === 0) {
+  const allFindings = byLevel(report.targets.flatMap(source))
+  if (allFindings.length === 0) {
     return (
       <section>
         <h2>Recent Findings</h2>
@@ -467,6 +488,8 @@ function RecentFindings({ report, onSelectFinding }) {
       </section>
     )
   }
+  const findings = expanded ? allFindings : allFindings.slice(0, RECENT_FINDINGS_INITIAL_COUNT)
+  const hiddenCount = allFindings.length - findings.length
   return (
     <section>
       <h2>Recent Findings</h2>
@@ -482,6 +505,11 @@ function RecentFindings({ report, onSelectFinding }) {
           </li>
         ))}
       </ul>
+      {hiddenCount > 0 && (
+        <button type="button" className="link-btn" onClick={() => setExpanded(true)}>
+          Show all {allFindings.length} findings ({hiddenCount} more)
+        </button>
+      )}
     </section>
   )
 }

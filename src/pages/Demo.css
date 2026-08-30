@@ -869,15 +869,18 @@ button {
    unknown final size arrives later" (see web.dev's CLS guide) -- gives the
    browser a size estimate to lay out around before the real content commits. */
 .overview-frame {
-  /* Raised from 900px: real runs on this deployment currently average
-     ~8-10 targets plus a Recent Findings list, closer to ~1500px than the
-     original guess (sized for demo.sh's fixed 6). CLS dropped from 0.782
-     to 0.478 after the first pass -- still real content taller than the
-     reservation. An exact match isn't possible (target/finding count is
-     data-dependent), this is a closer guess, not a guarantee. */
-  min-height: 1500px;
+  /* Two rounds of guessing a static number here (900px, then 1500px) made
+     CLS worse, not better -- because this page shows the latest *live*
+     run, target/finding count varies between page loads, so there was no
+     single number to converge on. Real fix (Demo.jsx): TargetGrid and
+     RecentFindings now cap their initial render to a fixed count (6 each,
+     matching OverviewSkeleton's 6 cards) instead of rendering everything.
+     Real content height is now bounded and roughly constant regardless of
+     how big the underlying run actually is, so this min-height only needs
+     to match that fixed shape, not chase a moving target. */
+  min-height: 1150px;
   content-visibility: auto;
-  contain-intrinsic-size: auto 1500px;
+  contain-intrinsic-size: auto 1150px;
 }
 
 .skeleton {
