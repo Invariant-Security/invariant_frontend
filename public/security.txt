@@ -1,0 +1,4 @@
+Contact: mailto:victord.goncalves@outlook.com
+Expires: 2027-08-30T00:00:00.000Z
+Preferred-Languages: pt-BR, en
+Canonical: https://invariantsec.org/.well-known/security.txt
