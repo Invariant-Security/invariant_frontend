@@ -17,6 +17,16 @@
     --ink: #14181f;
     --sub: #5b6478;
     --border: rgba(0, 0, 0, 0.1);
+    /* --green/--red/--amber/--blue were never overridden here -- they're
+       pastel tones picked for the dark background (--bg: #0f1420) and fail
+       WCAG AA (4.5:1) as text on a light one (verified: #3ecf8e is 2.0:1
+       on white, #ffcc66 is 1.49:1). Darker/more saturated variants here,
+       each checked against both --panel (#fff) and --bg (#f4f6fb) and
+       landing at 5:1+ on the tighter of the two. */
+    --green: #0f6b3f;
+    --red: #b91c1c;
+    --amber: #92400e;
+    --blue: #1d4ed8;
   }
 }
 
@@ -847,4 +857,65 @@ button {
   color: var(--sub);
   font-size: 0.75rem;
   margin: 0;
+}
+
+/* ---- loading skeleton (shown while /api/demo/runs/latest is in flight) ---- */
+/* Shared by the skeleton and the real content it's replaced by -- CLS
+   (layout shift) comes from the swap changing the page's height abruptly;
+   giving both a comparable min-height (sized for a typical demo.sh run,
+   ~6 targets) shrinks that jump instead of eliminating it (an exact match
+   isn't possible, real runs range 6-10+ targets). content-visibility +
+   contain-intrinsic-size is the standard mitigation for "content of
+   unknown final size arrives later" (see web.dev's CLS guide) -- gives the
+   browser a size estimate to lay out around before the real content commits. */
+.overview-frame {
+  /* Two rounds of guessing a static number here (900px, then 1500px) made
+     CLS worse, not better -- because this page shows the latest *live*
+     run, target/finding count varies between page loads, so there was no
+     single number to converge on. Real fix (Demo.jsx): TargetGrid and
+     RecentFindings now cap their initial render to a fixed count (6 each,
+     matching OverviewSkeleton's 6 cards) instead of rendering everything.
+     Real content height is now bounded and roughly constant regardless of
+     how big the underlying run actually is, so this min-height only needs
+     to match that fixed shape, not chase a moving target. */
+  min-height: 1150px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1150px;
+}
+
+.skeleton {
+  margin-top: 1.5rem;
+}
+.skeleton__block {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+.skeleton__block--hero {
+  height: 128px;
+}
+.skeleton__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.skeleton__block--card {
+  height: 140px;
+  border-radius: 8px;
+}
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton__block {
+    animation: none;
+    opacity: 0.8;
+  }
 }

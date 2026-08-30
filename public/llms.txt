@@ -1,0 +1,11 @@
+# Invariant
+
+Invariant transforma configuração de infraestrutura crítica em evidência
+auditável para ambientes híbridos e legados, normalizando benchmarks de
+segurança (CIS hoje) em controles versionados e avaliando ativos contra
+uma fonte rastreável.
+
+## Páginas
+
+- [Home](https://invariantsec.org/): explicação do produto e planos.
+- [Demo](https://invariantsec.org/demo): avaliação CIS ao vivo, progresso e histórico de execuções.
