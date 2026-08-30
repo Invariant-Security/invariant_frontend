@@ -561,24 +561,37 @@ function FindingDetail({ finding, onBack }) {
 // so the page reads as "loading" rather than "broken" for however long
 // that (now much smaller) request takes.
 function OverviewSkeleton() {
+  // 6 cards, not 3 -- matches a typical demo.sh run (6 containers) instead
+  // of an arbitrary smaller number, so the skeleton->real-content swap is a
+  // much smaller layout shift (real runs range 6-10+ targets; this can't
+  // match exactly, but a closer guess means a smaller CLS hit either way).
   return (
-    <div className="skeleton" aria-hidden="true">
+    <div className="skeleton overview-frame" aria-hidden="true">
       <div className="skeleton__block skeleton__block--hero" />
       <div className="skeleton__row">
-        <div className="skeleton__block skeleton__block--card" />
-        <div className="skeleton__block skeleton__block--card" />
-        <div className="skeleton__block skeleton__block--card" />
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="skeleton__block skeleton__block--card" />
+        ))}
       </div>
     </div>
   )
 }
 
-function AssessmentHistory({ runs, historyLoaded, onOpenRun }) {
+function AssessmentHistory({ runs, historyLoaded, historyError, onOpenRun }) {
   if (runs.length === 0 && !historyLoaded) {
     return (
       <section>
         <h2>Assessment History</h2>
         <p className="hint">Loading history&hellip;</p>
+      </section>
+    )
+  }
+
+  if (runs.length === 0 && historyError) {
+    return (
+      <section>
+        <h2>Assessment History</h2>
+        <p className="error">Could not load history: {historyError}</p>
       </section>
     )
   }
@@ -688,6 +701,7 @@ export default function Demo() {
   const [latestLoaded, setLatestLoaded] = useState(false)
   const [runs, setRuns] = useState([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [historyError, setHistoryError] = useState(null)
   const [error, setError] = useState(null)
 
   const [view, setView] = useState('overview')
@@ -700,10 +714,12 @@ export default function Demo() {
 
   useEffect(() => {
     let cancelled = false
+    let timeoutId
 
     async function poll() {
+      let nextStatus = null
       try {
-        const nextStatus = await fetchJson('/api/demo/status')
+        nextStatus = await fetchJson('/api/demo/status')
         if (cancelled) return
         setStatus(nextStatus)
         setStatusChecked(true)
@@ -711,13 +727,18 @@ export default function Demo() {
       } catch (err) {
         if (!cancelled) setError(err.message)
       }
+      if (cancelled) return
+      // 1s while a run is actively in progress (the checklist needs to
+      // feel live), 30s while idle -- no reason to hit this every second
+      // forever when nothing is happening.
+      const delay = nextStatus && !nextStatus.finished ? 1000 : 30000
+      timeoutId = setTimeout(poll, delay)
     }
 
     poll()
-    const id = setInterval(poll, 1000)
     return () => {
       cancelled = true
-      clearInterval(id)
+      clearTimeout(timeoutId)
     }
   }, [])
 
@@ -747,8 +768,9 @@ export default function Demo() {
         const history = await fetchJson('/api/demo/runs')
         if (cancelled) return
         setRuns(history ?? [])
+        setHistoryError(null)
       } catch (err) {
-        if (!cancelled) setError(err.message)
+        if (!cancelled) setHistoryError(err.message)
       } finally {
         if (!cancelled) setHistoryLoaded(true)
       }
@@ -817,7 +839,7 @@ export default function Demo() {
       {!isRunning && statusChecked && status && view === 'overview' && !latestLoaded && <OverviewSkeleton />}
 
       {!isRunning && statusChecked && status && view === 'overview' && latestLoaded && (
-        <>
+        <div className="overview-frame">
           <HeroAssessment run={latestRun} />
           <StatusLegend />
           {selectedTarget ? (
@@ -839,7 +861,7 @@ export default function Demo() {
             </>
           )}
           <PipelineStrip complete={Boolean(latestReport)} />
-        </>
+        </div>
       )}
 
       {statusChecked && view === 'assessments' &&
@@ -862,7 +884,7 @@ export default function Demo() {
             </>
           )
         ) : (
-          <AssessmentHistory runs={runs} historyLoaded={historyLoaded} onOpenRun={setSelectedRun} />
+          <AssessmentHistory runs={runs} historyLoaded={historyLoaded} historyError={historyError} onOpenRun={setSelectedRun} />
         ))}
 
       {view === 'evidence' &&

@@ -17,6 +17,16 @@
     --ink: #14181f;
     --sub: #5b6478;
     --border: rgba(0, 0, 0, 0.1);
+    /* --green/--red/--amber/--blue were never overridden here -- they're
+       pastel tones picked for the dark background (--bg: #0f1420) and fail
+       WCAG AA (4.5:1) as text on a light one (verified: #3ecf8e is 2.0:1
+       on white, #ffcc66 is 1.49:1). Darker/more saturated variants here,
+       each checked against both --panel (#fff) and --bg (#f4f6fb) and
+       landing at 5:1+ on the tighter of the two. */
+    --green: #0f6b3f;
+    --red: #b91c1c;
+    --amber: #92400e;
+    --blue: #1d4ed8;
   }
 }
 
@@ -850,6 +860,20 @@ button {
 }
 
 /* ---- loading skeleton (shown while /api/demo/runs/latest is in flight) ---- */
+/* Shared by the skeleton and the real content it's replaced by -- CLS
+   (layout shift) comes from the swap changing the page's height abruptly;
+   giving both a comparable min-height (sized for a typical demo.sh run,
+   ~6 targets) shrinks that jump instead of eliminating it (an exact match
+   isn't possible, real runs range 6-10+ targets). content-visibility +
+   contain-intrinsic-size is the standard mitigation for "content of
+   unknown final size arrives later" (see web.dev's CLS guide) -- gives the
+   browser a size estimate to lay out around before the real content commits. */
+.overview-frame {
+  min-height: 900px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
 .skeleton {
   margin-top: 1.5rem;
 }

@@ -245,6 +245,14 @@ export default function Home() {
 
   return (
     <div className="research-shell">
+      {/* React 19 hoists <link> rendered here to <head> and dedupes it --
+          scoped to Home (lazy-loaded) so /demo never requests these fonts. */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@600;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;800&display=swap"
+      />
       <header className="site-header">
         <button className="brand-lockup" onClick={() => scrollTo('top')} aria-label="Voltar ao início">
           <span className="wordmark">Invariant</span>

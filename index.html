@@ -5,12 +5,12 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Invariant transforma configuração de infraestrutura crítica em evidência auditável para ambientes híbridos e legados." />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Sora:wght@600;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;800&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Google Fonts (Sora/DM Mono/Manrope) moved to Home.jsx -- only Home
+         uses them, Demo.jsx uses system fonts, and loading them here meant
+         /demo paid a ~200ms render-blocking request for fonts it never
+         uses. React 19 hoists <link> rendered in JSX to <head>, and since
+         Home is React.lazy()-loaded, the request now only fires when Home
+         actually mounts. -->
     <title>Invariant — Evidência auditável para hardening</title>
   </head>
   <body>
