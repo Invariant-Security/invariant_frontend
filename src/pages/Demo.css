@@ -848,3 +848,41 @@ button {
   font-size: 0.75rem;
   margin: 0;
 }
+
+/* ---- loading skeleton (shown while /api/demo/runs/latest is in flight) ---- */
+.skeleton {
+  margin-top: 1.5rem;
+}
+.skeleton__block {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+.skeleton__block--hero {
+  height: 128px;
+}
+.skeleton__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.skeleton__block--card {
+  height: 140px;
+  border-radius: 8px;
+}
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton__block {
+    animation: none;
+    opacity: 0.8;
+  }
+}

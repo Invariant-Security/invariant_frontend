@@ -556,7 +556,33 @@ function FindingDetail({ finding, onBack }) {
   )
 }
 
-function AssessmentHistory({ runs, onOpenRun }) {
+// Shown while /api/demo/runs/latest is in flight, in place of Hero/Targets/
+// Recent Findings -- same layout shape, pulsing blocks instead of content,
+// so the page reads as "loading" rather than "broken" for however long
+// that (now much smaller) request takes.
+function OverviewSkeleton() {
+  return (
+    <div className="skeleton" aria-hidden="true">
+      <div className="skeleton__block skeleton__block--hero" />
+      <div className="skeleton__row">
+        <div className="skeleton__block skeleton__block--card" />
+        <div className="skeleton__block skeleton__block--card" />
+        <div className="skeleton__block skeleton__block--card" />
+      </div>
+    </div>
+  )
+}
+
+function AssessmentHistory({ runs, historyLoaded, onOpenRun }) {
+  if (runs.length === 0 && !historyLoaded) {
+    return (
+      <section>
+        <h2>Assessment History</h2>
+        <p className="hint">Loading history&hellip;</p>
+      </section>
+    )
+  }
+
   if (runs.length === 0) {
     return (
       <section>
@@ -658,7 +684,10 @@ function Footer() {
 export default function Demo() {
   const [status, setStatus] = useState(null)
   const [statusChecked, setStatusChecked] = useState(false)
+  const [latestRun, setLatestRun] = useState(null)
+  const [latestLoaded, setLatestLoaded] = useState(false)
   const [runs, setRuns] = useState([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const [error, setError] = useState(null)
 
   const [view, setView] = useState('overview')
@@ -667,7 +696,6 @@ export default function Demo() {
   const [selectedFinding, setSelectedFinding] = useState(null)
 
   const isRunning = Boolean(status && !status.finished)
-  const latestRun = runs[0] ?? null
   const latestReport = latestRun?.report ?? null
 
   useEffect(() => {
@@ -697,17 +725,36 @@ export default function Demo() {
     if (isRunning) return
     let cancelled = false
 
-    async function loadIdleData() {
+    // Sequential on purpose, not Promise.all: /api/demo/runs/latest is one
+    // run (~300KB today), /api/demo/runs is the entire history (73 runs,
+    // 22MB and growing) -- the small request finishing first is what lets
+    // the page paint immediately instead of waiting on the large one too.
+    async function loadData() {
       try {
-        const nextRuns = await fetchJson('/api/demo/runs')
+        const latest = await fetchJson('/api/demo/runs/latest')
         if (cancelled) return
-        setRuns(nextRuns ?? [])
+        setLatestRun(latest)
+        setError(null)
       } catch (err) {
         if (!cancelled) setError(err.message)
+      } finally {
+        if (!cancelled) setLatestLoaded(true)
+      }
+
+      if (cancelled) return
+
+      try {
+        const history = await fetchJson('/api/demo/runs')
+        if (cancelled) return
+        setRuns(history ?? [])
+      } catch (err) {
+        if (!cancelled) setError(err.message)
+      } finally {
+        if (!cancelled) setHistoryLoaded(true)
       }
     }
 
-    loadIdleData()
+    loadData()
     return () => {
       cancelled = true
     }
@@ -767,7 +814,9 @@ export default function Demo() {
         </section>
       )}
 
-      {!isRunning && statusChecked && status && view === 'overview' && (
+      {!isRunning && statusChecked && status && view === 'overview' && !latestLoaded && <OverviewSkeleton />}
+
+      {!isRunning && statusChecked && status && view === 'overview' && latestLoaded && (
         <>
           <HeroAssessment run={latestRun} />
           <StatusLegend />
@@ -813,7 +862,7 @@ export default function Demo() {
             </>
           )
         ) : (
-          <AssessmentHistory runs={runs} onOpenRun={setSelectedRun} />
+          <AssessmentHistory runs={runs} historyLoaded={historyLoaded} onOpenRun={setSelectedRun} />
         ))}
 
       {view === 'evidence' &&
