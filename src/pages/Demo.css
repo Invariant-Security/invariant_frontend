@@ -869,9 +869,15 @@ button {
    unknown final size arrives later" (see web.dev's CLS guide) -- gives the
    browser a size estimate to lay out around before the real content commits. */
 .overview-frame {
-  min-height: 900px;
+  /* Raised from 900px: real runs on this deployment currently average
+     ~8-10 targets plus a Recent Findings list, closer to ~1500px than the
+     original guess (sized for demo.sh's fixed 6). CLS dropped from 0.782
+     to 0.478 after the first pass -- still real content taller than the
+     reservation. An exact match isn't possible (target/finding count is
+     data-dependent), this is a closer guess, not a guarantee. */
+  min-height: 1500px;
   content-visibility: auto;
-  contain-intrinsic-size: auto 900px;
+  contain-intrinsic-size: auto 1500px;
 }
 
 .skeleton {

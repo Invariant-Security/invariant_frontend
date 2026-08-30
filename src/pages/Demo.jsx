@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { useDocumentLang } from '../hooks/useDocumentLang.js'
 import './Demo.css'
 
 // Default `uvicorn invariant.api.main:app --reload` address -- see the
@@ -695,6 +696,7 @@ function Footer() {
 }
 
 export default function Demo() {
+  useDocumentLang('en')
   const [status, setStatus] = useState(null)
   const [statusChecked, setStatusChecked] = useState(false)
   const [latestRun, setLatestRun] = useState(null)
@@ -812,6 +814,7 @@ export default function Demo() {
   return (
     <div className="page">
       <Header view={view} onNavigate={navigate} />
+      <main>
       {view === 'overview' && (
         <>
           <p className="page-subtitle">Live progress and run history for the CIS benchmark assessment demo.</p>
@@ -900,6 +903,7 @@ export default function Demo() {
             )}
           </section>
         ))}
+      </main>
 
       <Footer />
     </div>

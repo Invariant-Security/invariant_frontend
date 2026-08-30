@@ -12,6 +12,7 @@ import {
   ScanSearch,
   X,
 } from '../components/icons.jsx'
+import { useDocumentLang } from '../hooks/useDocumentLang.js'
 import { useScrollReveal } from '../hooks/useScrollReveal.js'
 import './Home.css'
 
@@ -226,6 +227,7 @@ function NewsletterForm() {
 }
 
 export default function Home() {
+  useDocumentLang('pt-BR')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [activations, setActivations] = useState(1)
   const [plan, setPlan] = useState('single')

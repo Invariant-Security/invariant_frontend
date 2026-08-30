@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -12,6 +12,16 @@
          Home is React.lazy()-loaded, the request now only fires when Home
          actually mounts. -->
     <title>Invariant — Evidência auditável para hardening</title>
+    <!-- Inlined instead of imported from index.css: PageSpeed flagged the
+         separate ~0.7KB request as render-blocking (~60ms) for content
+         this small -- not worth a network round trip. Keep this in sync
+         with src/index.css by hand if it ever changes (it's a minimal
+         reset, hasn't changed since the project started). -->
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; color-scheme: light dark; }
+      #root { min-height: 100svh; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
