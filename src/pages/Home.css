@@ -665,6 +665,43 @@
   color: var(--ink-soft);
 }
 
+/* ---- newsletter ---- */
+.newsletter-section {
+  background: var(--paper-raised);
+  border-top: 1px solid var(--line);
+  padding: 2.5rem clamp(1.25rem, 4vw, 3rem);
+  max-width: 76rem;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.newsletter-copy h3 {
+  margin: 0.2rem 0 0;
+  font-size: 1.1rem;
+}
+.newsletter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.newsletter-form input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  min-width: 16rem;
+}
+.newsletter-status {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.newsletter-error {
+  color: #b3261e;
+}
+
 /* ---- footer ---- */
 .site-footer {
   background: var(--ink);

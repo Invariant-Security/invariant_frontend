@@ -177,6 +177,54 @@ function CheckoutPanel({ plan, activations, onClose }) {
   )
 }
 
+function NewsletterForm() {
+  const [email, setEmail] = useState('')
+  const [state, setState] = useState('idle') // idle | loading | success | error
+
+  async function submit(event) {
+    event.preventDefault()
+    setState('loading')
+    try {
+      const response = await fetch(`${API_BASE}/newsletter/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      if (!response.ok) throw new Error()
+      setState('success')
+    } catch {
+      setState('error')
+    }
+  }
+
+  return (
+    <section className="newsletter-section">
+      <div className="newsletter-copy">
+        <p className="eyebrow">Fique por dentro</p>
+        <h3>Receba novidades da Invariant</h3>
+      </div>
+      {state === 'success' ? (
+        <p className="newsletter-status">Inscrição confirmada. Obrigado!</p>
+      ) : (
+        <form onSubmit={submit} className="newsletter-form">
+          <input
+            type="email"
+            required
+            placeholder="seu@email.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            aria-label="E-mail"
+          />
+          <button type="submit" className="primary-action" disabled={state === 'loading'}>
+            {state === 'loading' ? 'Enviando...' : 'Inscrever'}
+          </button>
+        </form>
+      )}
+      {state === 'error' && <p className="newsletter-status newsletter-error">Não foi possível inscrever agora. Tente de novo.</p>}
+    </section>
+  )
+}
+
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [activations, setActivations] = useState(1)
@@ -472,6 +520,8 @@ export default function Home() {
           <SourceNote>Valores são hipóteses de preço em teste, antes de impostos, sujeitas a ajuste por contrato.</SourceNote>
         </section>
       </main>
+
+      <NewsletterForm />
 
       <footer className="site-footer">
         <div className="footer-brand">Invariant</div>
