@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { byLevel, FindingListItem, FindingDetail } from '../findings.jsx'
 import './Console.css'
+import './Findings.css'
 
-// Escopo desta tela: cadastrar endpoints (IP único ou CIDR) e disparar a
-// identificação (windows/linux/docker/waf/firewall/vmware) -- rodar
-// checks CIS de verdade contra o que foi descoberto aqui é etapa futura,
-// não desta tela (ver invariant_assessment/preocupacoes.md).
+// Escopo desta tela: cadastrar endpoints (IP único ou CIDR), disparar a
+// identificação (windows/linux/docker/waf/firewall/vmware) e rodar um
+// assessment CIS real via SSH contra o que foi descoberto (POST
+// /endpoints/{id}/assess, invariant_api/routes/endpoints.py).
 
 function ClassificationBadge({ classification, confidence }) {
   if (!classification) return <span className="badge badge--unknown">not scanned</span>
@@ -16,7 +18,7 @@ function ClassificationBadge({ classification, confidence }) {
   )
 }
 
-function EndpointCard({ endpoint, discovering, onDiscover, onDelete, onViewResults }) {
+function EndpointCard({ endpoint, discovering, onDiscover, onDelete, onViewResults, onRunAssessment }) {
   return (
     <div className="target-card">
       <div className="target-card__title mono">{endpoint.address}</div>
@@ -37,6 +39,11 @@ function EndpointCard({ endpoint, discovering, onDiscover, onDelete, onViewResul
         {endpoint.classification && (
           <button type="button" className="link-btn" onClick={() => onViewResults(endpoint)}>
             View evidence →
+          </button>
+        )}
+        {endpoint.classification && (
+          <button type="button" className="link-btn" onClick={() => onRunAssessment(endpoint)}>
+            Run assessment →
           </button>
         )}
         <button type="button" className="link-btn" onClick={() => onDelete(endpoint.id)} style={{ color: 'var(--red)' }}>
@@ -82,6 +89,134 @@ function ResultsDetail({ endpoint, results, onBack }) {
   )
 }
 
+function AssessForm({
+  endpoint,
+  port,
+  username,
+  authMethod,
+  keyMaterial,
+  password,
+  assessing,
+  onPortChange,
+  onUsernameChange,
+  onAuthMethodChange,
+  onKeyMaterialChange,
+  onPasswordChange,
+  onSubmit,
+  onBack,
+}) {
+  return (
+    <section>
+      <button type="button" className="link-btn" onClick={onBack}>
+        ← Back
+      </button>
+      <h2 className="mono">Run assessment — {endpoint.address}</h2>
+      <p className="hint">Credentials are used once for this request and never stored.</p>
+      <form className="endpoint-form" onSubmit={onSubmit}>
+        <div className="field">
+          <label htmlFor="assess-port">Port</label>
+          <input
+            id="assess-port"
+            type="number"
+            value={port}
+            onChange={(e) => onPortChange(e.target.value)}
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="assess-username">Username</label>
+          <input id="assess-username" value={username} onChange={(e) => onUsernameChange(e.target.value)} required />
+        </div>
+        <div className="field">
+          <label>Auth method</label>
+          <div className="toggle-group">
+            <button
+              type="button"
+              className={`toggle-group__btn ${authMethod === 'key' ? 'toggle-group__btn--active' : ''}`}
+              onClick={() => onAuthMethodChange('key')}
+            >
+              SSH key
+            </button>
+            <button
+              type="button"
+              className={`toggle-group__btn ${authMethod === 'password' ? 'toggle-group__btn--active' : ''}`}
+              onClick={() => onAuthMethodChange('password')}
+            >
+              Password
+            </button>
+          </div>
+        </div>
+        {authMethod === 'key' ? (
+          <div className="field">
+            <label htmlFor="assess-key">Private key</label>
+            <textarea
+              id="assess-key"
+              className="mono"
+              rows={6}
+              placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+              value={keyMaterial}
+              onChange={(e) => onKeyMaterialChange(e.target.value)}
+              required
+            />
+          </div>
+        ) : (
+          <div className="field">
+            <label htmlFor="assess-password">Password</label>
+            <input
+              id="assess-password"
+              type="password"
+              value={password}
+              onChange={(e) => onPasswordChange(e.target.value)}
+              required
+            />
+          </div>
+        )}
+        <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '0.55rem 1.2rem' }} disabled={assessing}>
+          {assessing ? 'Running…' : 'Run assessment'}
+        </button>
+      </form>
+    </section>
+  )
+}
+
+function AssessResult({ endpoint, findings, onSelectFinding, onBack }) {
+  const failed = findings.filter((f) => f.status === 'FAIL')
+  const passed = findings.filter((f) => f.status === 'PASS')
+  return (
+    <section>
+      <button type="button" className="link-btn" onClick={onBack}>
+        ← Back
+      </button>
+      <h2 className="mono">{endpoint.address}</h2>
+      <div className="card__counts">
+        <span className="badge badge--pass">{passed.length} PASS</span>
+        <span className="badge badge--fail">{failed.length} FAIL</span>
+      </div>
+      {failed.length > 0 && (
+        <>
+          <h4 className="finding-group">Failed ({failed.length})</h4>
+          <ul className="finding-list">
+            {byLevel(failed).map((f) => (
+              <FindingListItem key={f.external_id} finding={f} onSelect={onSelectFinding} />
+            ))}
+          </ul>
+        </>
+      )}
+      {passed.length > 0 && (
+        <details className="finding-details">
+          <summary>Passed ({passed.length})</summary>
+          <ul className="finding-list">
+            {byLevel(passed).map((f) => (
+              <FindingListItem key={f.external_id} finding={f} onSelect={onSelectFinding} />
+            ))}
+          </ul>
+        </details>
+      )}
+      {findings.length === 0 && <p className="hint">No findings returned.</p>}
+    </section>
+  )
+}
+
 export default function Endpoints({ apiFetch, username, onLogout }) {
   const [endpoints, setEndpoints] = useState([])
   const [loaded, setLoaded] = useState(false)
@@ -89,7 +224,18 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
   const [newAddress, setNewAddress] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [discoveringId, setDiscoveringId] = useState(null)
-  const [detail, setDetail] = useState(null) // {endpoint, results} | null
+  // null = endpoint list. Otherwise a tagged union:
+  //   {kind:'discovery', endpoint, results}
+  //   {kind:'assess-form', endpoint}
+  //   {kind:'assess-result', endpoint, findings}
+  //   {kind:'finding-detail', endpoint, findings, finding}
+  const [detail, setDetail] = useState(null)
+  const [assessPort, setAssessPort] = useState(22)
+  const [assessUsername, setAssessUsername] = useState('')
+  const [assessAuthMethod, setAssessAuthMethod] = useState('key')
+  const [assessKeyMaterial, setAssessKeyMaterial] = useState('')
+  const [assessPassword, setAssessPassword] = useState('')
+  const [assessing, setAssessing] = useState(false)
 
   async function loadEndpoints() {
     const response = await apiFetch('/endpoints')
@@ -154,9 +300,51 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
     try {
       const response = await apiFetch(`/endpoints/${endpoint.id}/results`)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      setDetail({ endpoint, results: await response.json() })
+      setDetail({ kind: 'discovery', endpoint, results: await response.json() })
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  function handleOpenAssessForm(endpoint) {
+    setAssessPort(22)
+    setAssessUsername('')
+    setAssessAuthMethod('key')
+    setAssessKeyMaterial('')
+    setAssessPassword('')
+    setError(null)
+    setDetail({ kind: 'assess-form', endpoint })
+  }
+
+  async function handleSubmitAssess(e) {
+    e.preventDefault()
+    setError(null)
+    setAssessing(true)
+    const endpoint = detail.endpoint
+    try {
+      const response = await apiFetch(`/endpoints/${endpoint.id}/assess`, {
+        method: 'POST',
+        body: JSON.stringify({
+          port: Number(assessPort) || 22,
+          username: assessUsername,
+          auth_method: assessAuthMethod,
+          key_material: assessAuthMethod === 'key' ? assessKeyMaterial : null,
+          password: assessAuthMethod === 'password' ? assessPassword : null,
+        }),
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.detail ?? `HTTP ${response.status}`)
+      }
+      const findings = await response.json()
+      setDetail({ kind: 'assess-result', endpoint, findings })
+    } catch (err) {
+      setError(err.message)
+      // stays on 'assess-form' so port/username don't need to be retyped
+    } finally {
+      setAssessKeyMaterial('')
+      setAssessPassword('')
+      setAssessing(false)
     }
   }
 
@@ -216,13 +404,50 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
                 onDiscover={handleDiscover}
                 onDelete={handleDelete}
                 onViewResults={handleViewResults}
+                onRunAssessment={handleOpenAssessForm}
               />
             ))}
           </div>
         </>
       )}
 
-      {detail && <ResultsDetail endpoint={detail.endpoint} results={detail.results} onBack={() => setDetail(null)} />}
+      {detail?.kind === 'discovery' && (
+        <ResultsDetail endpoint={detail.endpoint} results={detail.results} onBack={() => setDetail(null)} />
+      )}
+      {detail?.kind === 'assess-form' && (
+        <AssessForm
+          endpoint={detail.endpoint}
+          port={assessPort}
+          username={assessUsername}
+          authMethod={assessAuthMethod}
+          keyMaterial={assessKeyMaterial}
+          password={assessPassword}
+          assessing={assessing}
+          onPortChange={setAssessPort}
+          onUsernameChange={setAssessUsername}
+          onAuthMethodChange={setAssessAuthMethod}
+          onKeyMaterialChange={setAssessKeyMaterial}
+          onPasswordChange={setAssessPassword}
+          onSubmit={handleSubmitAssess}
+          onBack={() => setDetail(null)}
+        />
+      )}
+      {detail?.kind === 'assess-result' && (
+        <AssessResult
+          endpoint={detail.endpoint}
+          findings={detail.findings}
+          onSelectFinding={(finding) =>
+            setDetail({ kind: 'finding-detail', endpoint: detail.endpoint, findings: detail.findings, finding })
+          }
+          onBack={() => setDetail(null)}
+        />
+      )}
+      {detail?.kind === 'finding-detail' && (
+        <FindingDetail
+          finding={detail.finding}
+          onBack={() => setDetail({ kind: 'assess-result', endpoint: detail.endpoint, findings: detail.findings })}
+        />
+      )}
     </div>
   )
 }

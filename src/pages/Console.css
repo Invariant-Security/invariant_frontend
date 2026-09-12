@@ -126,7 +126,8 @@ button {
   color: var(--sub);
 }
 
-.field input {
+.field input,
+.field textarea {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -135,9 +136,37 @@ button {
   font: inherit;
 }
 
-.field input:focus {
+.field input:focus,
+.field textarea:focus {
   outline: 2px solid var(--blue);
   outline-offset: 1px;
+}
+
+/* Primeiro toggle do console -- 2 botões estilo tab em vez de <select>
+   (sem estilo aplicado aqui, só Home.css tem um <select> com CSS isolado da
+   home pública) ou radios (sem precedente visual): o console já resolve
+   toda escolha com botões (Discover/Delete/View evidence), então "Run
+   assessment"'s auth_method (key vs password) segue o mesmo idioma. */
+.toggle-group {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.toggle-group__btn {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--sub);
+  cursor: pointer;
+  font: inherit;
+}
+
+.toggle-group__btn--active {
+  background: var(--blue);
+  color: var(--bg);
+  border-color: var(--blue);
 }
 
 .btn-primary {

@@ -1,0 +1,109 @@
+// Renderização de Finding compartilhada entre Demo.jsx (/demo, pública) e
+// Endpoints.jsx (/endpoints, console autenticado -- fluxo "Run assessment").
+// Extraído de Demo.jsx: nenhuma lógica nova aqui, só as peças puras que as
+// duas telas precisam. Classes CSS em Findings.css.
+
+// CIS's own severity/profile tier -- Level 1 (baseline) before Level 2
+// (defense-in-depth, may affect functionality) before "no applicability
+// data" -- see Finding.level's own docstring in assessment/__init__.py for
+// why it's the minimum across a control's applicability list, not a single
+// fixed value.
+export function byLevel(findings) {
+  return [...findings].sort((a, b) => (a.level ?? 99) - (b.level ?? 99))
+}
+
+export function LevelBadge({ level }) {
+  if (level == null) return null
+  return <span className={`finding-badge finding-badge--level${level}`}>L{level}</span>
+}
+
+export function FindingListItem({ finding, onSelect }) {
+  return (
+    <li className="finding">
+      <div className="finding__head">
+        <span className="mono">{finding.external_id}</span>
+        <LevelBadge level={finding.level} />
+        <span>{finding.control_title}</span>
+      </div>
+      <div className="finding__meta">
+        {finding.source_name}/{finding.document_name} v{finding.document_version}
+        {finding.scored === false && ' · not scored'}
+      </div>
+      <div className="finding__evidence mono">{finding.evidence_output}</div>
+      <button type="button" className="link-btn" onClick={() => onSelect(finding)}>
+        View evidence →
+      </button>
+    </li>
+  )
+}
+
+export function EvidenceChain({ finding }) {
+  const steps = [
+    { label: 'Finding', value: `${finding.external_id} — ${finding.status}` },
+    { label: 'Control', value: finding.control_title },
+    { label: 'Security Source', value: finding.source_name },
+    { label: 'Document', value: finding.document_name },
+    { label: 'Document Version', value: `v${finding.document_version}` },
+  ]
+  if (finding.raw_artifact_path) {
+    steps.push({
+      label: 'Original evidence',
+      value: finding.raw_artifact_path,
+      mono: true,
+      sub: finding.content_hash ? `sha256:${finding.content_hash.slice(0, 16)}…` : null,
+    })
+  }
+  return (
+    <ol className="finding-evidence-chain">
+      {steps.map((s) => (
+        <li key={s.label} className="finding-evidence-chain__step">
+          <div className="finding-evidence-chain__label">{s.label}</div>
+          <div className={`finding-evidence-chain__value ${s.mono ? 'mono' : ''}`}>{s.value}</div>
+          {s.sub && <div className="finding-evidence-chain__sub mono">{s.sub}</div>}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+export function FindingDetail({ finding, onBack }) {
+  return (
+    <section className="finding-detail">
+      <button type="button" className="link-btn" onClick={onBack}>
+        ← Back
+      </button>
+      <span className="finding-detail__eyebrow">FINDING</span>
+      <h2>
+        {finding.control_title} <LevelBadge level={finding.level} />
+      </h2>
+
+      <div className="finding-detail__grid">
+        <div>
+          <div className="finding-detail__label">Target</div>
+          <div className="mono">{finding.target}</div>
+        </div>
+        <div>
+          <div className="finding-detail__label">Observed</div>
+          <div className="mono">{finding.evidence_output}</div>
+        </div>
+        <div>
+          <div className="finding-detail__label">CIS profile</div>
+          <div>
+            {finding.level != null ? `Level ${finding.level}` : 'No applicability data'}
+            {finding.scored === false && ' · not scored'}
+          </div>
+        </div>
+      </div>
+
+      {finding.remediation && (
+        <div className="finding-detail__remediation">
+          <h3>How to fix</h3>
+          <p>{finding.remediation}</p>
+        </div>
+      )}
+
+      <h3>Evidence Chain</h3>
+      <EvidenceChain finding={finding} />
+    </section>
+  )
+}
