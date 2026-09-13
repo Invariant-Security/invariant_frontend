@@ -9,13 +9,15 @@ const Home = lazy(() => import('./pages/Home.jsx'))
 const Setup = lazy(() => import('./pages/Setup.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Endpoints = lazy(() => import('./pages/Endpoints.jsx'))
+const Containers = lazy(() => import('./pages/Containers.jsx'))
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
 
-// /setup, /login, /endpoints são as 3 telas do "console" autenticado do
-// appliance (bootstrap de admin -> login -> cadastro de endpoints) --
-// distintas de /demo e / (Home), que continuam públicas, sem auth nenhuma.
-const CONSOLE_PATHS = new Set(['/setup', '/login', '/endpoints'])
+// /setup, /login, /endpoints, /containers são as telas do "console"
+// autenticado do appliance (bootstrap de admin -> login -> cadastro de
+// endpoints / containers Docker deste host) -- distintas de /demo e /
+// (Home), que continuam públicas, sem auth nenhuma.
+const CONSOLE_PATHS = new Set(['/setup', '/login', '/endpoints', '/containers'])
 
 async function apiFetch(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -80,7 +82,10 @@ export default function App() {
 
       {isConsoleRoute && authGate?.mode === 'setup' && <Setup apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />}
       {isConsoleRoute && authGate?.mode === 'login' && <Login apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />}
-      {isConsoleRoute && authGate?.mode === 'authed' && (
+      {isConsoleRoute && authGate?.mode === 'authed' && path === '/containers' && (
+        <Containers apiFetch={apiFetch} username={authGate.username} onLogout={handleLogout} />
+      )}
+      {isConsoleRoute && authGate?.mode === 'authed' && path !== '/containers' && (
         <Endpoints apiFetch={apiFetch} username={authGate.username} onLogout={handleLogout} />
       )}
       {isConsoleRoute && authGate?.mode === 'error' && (

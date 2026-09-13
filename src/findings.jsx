@@ -66,6 +66,44 @@ export function EvidenceChain({ finding }) {
   )
 }
 
+export function FindingsReport({ title, findings, onSelectFinding, onBack }) {
+  const failed = findings.filter((f) => f.status === 'FAIL')
+  const passed = findings.filter((f) => f.status === 'PASS')
+  return (
+    <section>
+      <button type="button" className="link-btn" onClick={onBack}>
+        ← Back
+      </button>
+      <h2 className="mono">{title}</h2>
+      <div className="card__counts">
+        <span className="badge badge--pass">{passed.length} PASS</span>
+        <span className="badge badge--fail">{failed.length} FAIL</span>
+      </div>
+      {failed.length > 0 && (
+        <>
+          <h4 className="finding-group">Failed ({failed.length})</h4>
+          <ul className="finding-list">
+            {byLevel(failed).map((f) => (
+              <FindingListItem key={f.external_id} finding={f} onSelect={onSelectFinding} />
+            ))}
+          </ul>
+        </>
+      )}
+      {passed.length > 0 && (
+        <details className="finding-details">
+          <summary>Passed ({passed.length})</summary>
+          <ul className="finding-list">
+            {byLevel(passed).map((f) => (
+              <FindingListItem key={f.external_id} finding={f} onSelect={onSelectFinding} />
+            ))}
+          </ul>
+        </details>
+      )}
+      {findings.length === 0 && <p className="hint">No findings returned.</p>}
+    </section>
+  )
+}
+
 export function FindingDetail({ finding, onBack }) {
   return (
     <section className="finding-detail">

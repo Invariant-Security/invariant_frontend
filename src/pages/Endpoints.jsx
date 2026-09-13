@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { byLevel, FindingListItem, FindingDetail } from '../findings.jsx'
+import { FindingsReport, FindingDetail } from '../findings.jsx'
 import './Console.css'
 import './Findings.css'
 
@@ -179,44 +179,6 @@ function AssessForm({
   )
 }
 
-function AssessResult({ endpoint, findings, onSelectFinding, onBack }) {
-  const failed = findings.filter((f) => f.status === 'FAIL')
-  const passed = findings.filter((f) => f.status === 'PASS')
-  return (
-    <section>
-      <button type="button" className="link-btn" onClick={onBack}>
-        ← Back
-      </button>
-      <h2 className="mono">{endpoint.address}</h2>
-      <div className="card__counts">
-        <span className="badge badge--pass">{passed.length} PASS</span>
-        <span className="badge badge--fail">{failed.length} FAIL</span>
-      </div>
-      {failed.length > 0 && (
-        <>
-          <h4 className="finding-group">Failed ({failed.length})</h4>
-          <ul className="finding-list">
-            {byLevel(failed).map((f) => (
-              <FindingListItem key={f.external_id} finding={f} onSelect={onSelectFinding} />
-            ))}
-          </ul>
-        </>
-      )}
-      {passed.length > 0 && (
-        <details className="finding-details">
-          <summary>Passed ({passed.length})</summary>
-          <ul className="finding-list">
-            {byLevel(passed).map((f) => (
-              <FindingListItem key={f.external_id} finding={f} onSelect={onSelectFinding} />
-            ))}
-          </ul>
-        </details>
-      )}
-      {findings.length === 0 && <p className="hint">No findings returned.</p>}
-    </section>
-  )
-}
-
 export default function Endpoints({ apiFetch, username, onLogout }) {
   const [endpoints, setEndpoints] = useState([])
   const [loaded, setLoaded] = useState(false)
@@ -353,6 +315,9 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
       <header className="site-header">
         <div className="brand">INVARIANT</div>
         <div className="session-info">
+          <a className="link-btn" href="/containers">
+            Containers
+          </a>
           <span>{username}</span>
           <button type="button" className="btn-secondary" onClick={onLogout}>
             Log out
@@ -433,8 +398,8 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
         />
       )}
       {detail?.kind === 'assess-result' && (
-        <AssessResult
-          endpoint={detail.endpoint}
+        <FindingsReport
+          title={detail.endpoint.address}
           findings={detail.findings}
           onSelectFinding={(finding) =>
             setDetail({ kind: 'finding-detail', endpoint: detail.endpoint, findings: detail.findings, finding })
