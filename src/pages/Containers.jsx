@@ -36,7 +36,7 @@ export default function Containers({ apiFetch, username, onLogout }) {
   const [detail, setDetail] = useState(null)
 
   useEffect(() => {
-    apiFetch('/containers')
+    apiFetch('/api/containers')
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         return response.json()
@@ -51,7 +51,7 @@ export default function Containers({ apiFetch, username, onLogout }) {
     setAssessingName(container.name)
     setError(null)
     try {
-      const response = await apiFetch(`/assess/${container.name}`, { method: 'POST' })
+      const response = await apiFetch(`/api/assess/${container.name}`, { method: 'POST' })
       if (!response.ok) {
         const body = await response.json().catch(() => ({}))
         throw new Error(body.detail ?? `HTTP ${response.status}`)

@@ -200,7 +200,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
   const [assessing, setAssessing] = useState(false)
 
   async function loadEndpoints() {
-    const response = await apiFetch('/endpoints')
+    const response = await apiFetch('/api/endpoints')
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     setEndpoints(await response.json())
   }
@@ -216,7 +216,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
     e.preventDefault()
     setError(null)
     try {
-      const response = await apiFetch('/endpoints', {
+      const response = await apiFetch('/api/endpoints', {
         method: 'POST',
         body: JSON.stringify({ address: newAddress, label: newLabel || null, tags: [] }),
       })
@@ -234,7 +234,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
 
   async function handleDelete(id) {
     try {
-      await apiFetch(`/endpoints/${id}`, { method: 'DELETE' })
+      await apiFetch(`/api/endpoints/${id}`, { method: 'DELETE' })
       await loadEndpoints()
     } catch (err) {
       setError(err.message)
@@ -245,7 +245,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
     setDiscoveringId(id)
     setError(null)
     try {
-      const response = await apiFetch(`/endpoints/${id}/discover`, { method: 'POST' })
+      const response = await apiFetch(`/api/endpoints/${id}/discover`, { method: 'POST' })
       if (!response.ok) {
         const body = await response.json().catch(() => ({}))
         throw new Error(body.detail ?? `HTTP ${response.status}`)
@@ -260,7 +260,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
 
   async function handleViewResults(endpoint) {
     try {
-      const response = await apiFetch(`/endpoints/${endpoint.id}/results`)
+      const response = await apiFetch(`/api/endpoints/${endpoint.id}/results`)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       setDetail({ kind: 'discovery', endpoint, results: await response.json() })
     } catch (err) {
@@ -284,7 +284,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
     setAssessing(true)
     const endpoint = detail.endpoint
     try {
-      const response = await apiFetch(`/endpoints/${endpoint.id}/assess`, {
+      const response = await apiFetch(`/api/endpoints/${endpoint.id}/assess`, {
         method: 'POST',
         body: JSON.stringify({
           port: Number(assessPort) || 22,
