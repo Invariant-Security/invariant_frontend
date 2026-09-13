@@ -128,6 +128,12 @@ export default function Containers({ apiFetch, username, onLogout }) {
   const [error, setError] = useState(null)
   const [compat, setCompat] = useState({}) // name -> state (see defaultState())
   const [busy, setBusy] = useState(false)
+  // true only once a "Run selected" batch has fully finished -- gates the
+  // consolidated export so it can never fire against a still-running or
+  // stale batch (a fresh Check compatibility invalidates it again).
+  const [batchCompleted, setBatchCompleted] = useState(false)
+  const [lastBatchTargets, setLastBatchTargets] = useState([])
+  const [exportingConsolidated, setExportingConsolidated] = useState(false)
   // null = container list. Otherwise:
   //   {kind:'assess-result', container, findings}
   //   {kind:'finding-detail', container, findings, finding}
@@ -160,6 +166,8 @@ export default function Containers({ apiFetch, username, onLogout }) {
     if (busy || containers.length === 0) return
     setBusy(true)
     setError(null)
+    setBatchCompleted(false) // any previous batch's results are about to be wiped
+    setLastBatchTargets([])
     setCompat(() => {
       const next = {}
       for (const c of containers) next[c.name] = { ...defaultState(), checkStatus: 'checking' }
@@ -226,6 +234,8 @@ export default function Containers({ apiFetch, username, onLogout }) {
     const targets = supported.filter((c) => compat[c.name]?.selected)
     if (targets.length === 0) return
     setBusy(true)
+    setBatchCompleted(false)
+    setLastBatchTargets(targets)
     setError(null)
     for (const c of targets) {
       setContainerState(c.name, { assessmentStatus: 'queued', findings: null, assessError: null })
@@ -241,7 +251,42 @@ export default function Containers({ apiFetch, username, onLogout }) {
           setContainerState(c.name, { assessmentStatus: 'error', assessError: settled.reason.message })
         }
       },
-    ).finally(() => setBusy(false))
+    ).finally(() => {
+      setBusy(false)
+      setBatchCompleted(true)
+    })
+  }
+
+  async function handleExportConsolidated() {
+    if (busy) return
+    setExportingConsolidated(true)
+    try {
+      const assets = lastBatchTargets.map((c) => {
+        const state = compat[c.name]
+        return {
+          name: c.name,
+          status: state?.assessmentStatus === 'success' ? 'success' : 'error',
+          findings: state?.findings ?? [],
+          error: state?.assessError ?? null,
+        }
+      })
+      const response = await apiFetch('/api/reports/pdf', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Consolidated Assessment', kind: 'consolidated', assets }),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'invariant-consolidated-report.pdf'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      window.alert(`Falha ao exportar relatório consolidado: ${err.message}`)
+    } finally {
+      setExportingConsolidated(false)
+    }
   }
 
   function openReport(container) {
@@ -287,6 +332,16 @@ export default function Containers({ apiFetch, username, onLogout }) {
               {checked && (
                 <button type="button" className="btn-primary" style={{ width: 'auto' }} onClick={handleRunSelected} disabled={busy || selectedCount === 0}>
                   Run selected ({selectedCount})
+                </button>
+              )}
+              {batchCompleted && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleExportConsolidated}
+                  disabled={busy || exportingConsolidated}
+                >
+                  {exportingConsolidated ? 'Exportando…' : 'Export consolidated report'}
                 </button>
               )}
             </div>
