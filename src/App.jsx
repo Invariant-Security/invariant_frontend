@@ -82,11 +82,11 @@ export default function App() {
 
       {isConsoleRoute && authGate?.mode === 'setup' && <Setup apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />}
       {isConsoleRoute && authGate?.mode === 'login' && <Login apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />}
-      {isConsoleRoute && authGate?.mode === 'authed' && path === '/containers' && (
-        <Containers apiFetch={apiFetch} username={authGate.username} onLogout={handleLogout} />
-      )}
-      {isConsoleRoute && authGate?.mode === 'authed' && path !== '/containers' && (
+      {isConsoleRoute && authGate?.mode === 'authed' && path === '/endpoints' && (
         <Endpoints apiFetch={apiFetch} username={authGate.username} onLogout={handleLogout} />
+      )}
+      {isConsoleRoute && authGate?.mode === 'authed' && path !== '/endpoints' && (
+        <Containers apiFetch={apiFetch} username={authGate.username} onLogout={handleLogout} />
       )}
       {isConsoleRoute && authGate?.mode === 'error' && (
         <p style={{ padding: '2rem', fontFamily: 'sans-serif' }}>

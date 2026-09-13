@@ -70,9 +70,6 @@ export default function Containers({ apiFetch, username, onLogout }) {
       <header className="site-header">
         <div className="brand">INVARIANT</div>
         <div className="session-info">
-          <a className="link-btn" href="/endpoints">
-            Endpoints
-          </a>
           <span>{username}</span>
           <button type="button" className="btn-secondary" onClick={onLogout}>
             Log out
@@ -108,6 +105,7 @@ export default function Containers({ apiFetch, username, onLogout }) {
         <FindingsReport
           title={detail.container.name}
           findings={detail.findings}
+          apiFetch={apiFetch}
           onSelectFinding={(finding) =>
             setDetail({ kind: 'finding-detail', container: detail.container, findings: detail.findings, finding })
           }

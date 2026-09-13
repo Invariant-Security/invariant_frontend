@@ -1,7 +1,9 @@
+import { useState } from 'react'
+
 // Renderização de Finding compartilhada entre Demo.jsx (/demo, pública) e
-// Endpoints.jsx (/endpoints, console autenticado -- fluxo "Run assessment").
-// Extraído de Demo.jsx: nenhuma lógica nova aqui, só as peças puras que as
-// duas telas precisam. Classes CSS em Findings.css.
+// Endpoints.jsx/Containers.jsx (console autenticado -- fluxo "Run
+// assessment"). Extraído de Demo.jsx: nenhuma lógica nova aqui, só as
+// peças puras que as telas precisam. Classes CSS em Findings.css.
 
 // CIS's own severity/profile tier -- Level 1 (baseline) before Level 2
 // (defense-in-depth, may affect functionality) before "no applicability
@@ -66,9 +68,33 @@ export function EvidenceChain({ finding }) {
   )
 }
 
-export function FindingsReport({ title, findings, onSelectFinding, onBack }) {
+export function FindingsReport({ title, findings, onSelectFinding, onBack, apiFetch }) {
   const failed = findings.filter((f) => f.status === 'FAIL')
   const passed = findings.filter((f) => f.status === 'PASS')
+  const [exporting, setExporting] = useState(null) // 'ceo' | 'technical' | null
+
+  async function handleExportPdf(kind) {
+    setExporting(kind)
+    try {
+      const response = await apiFetch('/api/reports/pdf', {
+        method: 'POST',
+        body: JSON.stringify({ title, kind, findings }),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `invariant-${kind}-report.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      window.alert(`Falha ao exportar PDF: ${err.message}`)
+    } finally {
+      setExporting(null)
+    }
+  }
+
   return (
     <section>
       <button type="button" className="link-btn" onClick={onBack}>
@@ -78,6 +104,19 @@ export function FindingsReport({ title, findings, onSelectFinding, onBack }) {
       <div className="card__counts">
         <span className="badge badge--pass">{passed.length} PASS</span>
         <span className="badge badge--fail">{failed.length} FAIL</span>
+      </div>
+      <div style={{ display: 'flex', gap: '0.75rem', margin: '0.75rem 0 1rem' }}>
+        <button type="button" className="link-btn" onClick={() => handleExportPdf('ceo')} disabled={exporting !== null}>
+          {exporting === 'ceo' ? 'Exportando…' : 'Exportar PDF (CEO) →'}
+        </button>
+        <button
+          type="button"
+          className="link-btn"
+          onClick={() => handleExportPdf('technical')}
+          disabled={exporting !== null}
+        >
+          {exporting === 'technical' ? 'Exportando…' : 'Exportar PDF (Técnico) →'}
+        </button>
       </div>
       {failed.length > 0 && (
         <>

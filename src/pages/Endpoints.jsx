@@ -315,9 +315,6 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
       <header className="site-header">
         <div className="brand">INVARIANT</div>
         <div className="session-info">
-          <a className="link-btn" href="/containers">
-            Containers
-          </a>
           <span>{username}</span>
           <button type="button" className="btn-secondary" onClick={onLogout}>
             Log out
@@ -401,6 +398,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
         <FindingsReport
           title={detail.endpoint.address}
           findings={detail.findings}
+          apiFetch={apiFetch}
           onSelectFinding={(finding) =>
             setDetail({ kind: 'finding-detail', endpoint: detail.endpoint, findings: detail.findings, finding })
           }
