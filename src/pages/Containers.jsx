@@ -1,26 +1,123 @@
 import { useEffect, useState } from 'react'
+import { runWithConcurrency } from '../containerBatch.js'
 import { FindingsReport, FindingDetail } from '../findings.jsx'
 import './Console.css'
 import './Findings.css'
 
 // Escopo desta tela: listar containers Docker deste host (GET /containers,
-// já filtra fora o próprio stack do invariant) e rodar assessment CIS real
-// contra um deles via docker exec (POST /assess/{target}, mesmo mecanismo
-// do /demo -- sem credenciais, ao contrário do fluxo SSH de Endpoints.jsx).
+// já filtra fora o próprio stack do invariant), descobrir de antemão quais
+// têm SO compatível (GET /containers/{name}/check -- leve, não roda os 199
+// checks) e rodar o assessment real (POST /assess/{target}, docker exec,
+// mesmo mecanismo do /demo -- sem credenciais) um de cada vez ou em lote.
+//
+// "Compatível" (checkStatus) e "deve entrar no lote" (selected) são
+// conceitos deliberadamente separados -- o backend só sabe dizer se o SO
+// tem checks CIS; ele não sabe distinguir um container de aplicação
+// (tamois, babybet) de infra (postgres, redis, nginx) que por acaso também
+// rode Debian/Ubuntu. Sem nenhum label/metadado pra fazer essa distinção
+// hoje, a seleção pro "Run selected" é sempre opt-in do usuário -- nunca
+// pré-marcada, nem para os compatíveis.
+//
+// `busy` é um lock de UI único (não um scheduler): enquanto qualquer
+// checagem ou assessment estiver em voo -- Check, lote, avulso ou retry --
+// todo outro gatilho fica desabilitado. Isso é o que garante que o pool de
+// concorrência 2 do "Run selected" realmente signifique "no máximo 2 ao
+// mesmo tempo": sem o lock, um "Run assessment →" avulso clicado durante o
+// lote criaria um terceiro assessment simultâneo contra produção.
 
-function ContainerCard({ container, assessing, onRunAssessment }) {
+const RUN_SELECTED_CONCURRENCY = 2
+
+function defaultState() {
+  return {
+    checkStatus: 'idle', // 'idle' | 'checking' | 'supported' | 'unsupported' | 'error'
+    osLabel: null,
+    reason: null,
+    selected: false,
+    assessmentStatus: 'idle', // 'idle' | 'queued' | 'running' | 'success' | 'error'
+    findings: null,
+    assessError: null,
+  }
+}
+
+function AssessAction({ state, busy, onRun }) {
+  switch (state.assessmentStatus) {
+    case 'queued':
+      return <span className="hint">Na fila…</span>
+    case 'running':
+      return <span className="hint">Avaliando…</span>
+    case 'success': {
+      const passed = state.findings.filter((f) => f.status === 'PASS').length
+      const failed = state.findings.filter((f) => f.status === 'FAIL').length
+      return (
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className="badge badge--pass">{passed} PASS</span>
+          <span className="badge badge--fail">{failed} FAIL</span>
+          <button type="button" className="link-btn" onClick={onRun} disabled={busy}>
+            Ver relatório →
+          </button>
+        </div>
+      )
+    }
+    case 'error':
+      return (
+        <div>
+          <p className="hint" style={{ color: 'var(--red)' }}>
+            {state.assessError}
+          </p>
+          <button type="button" className="link-btn" onClick={onRun} disabled={busy}>
+            Retry →
+          </button>
+        </div>
+      )
+    default:
+      return (
+        <button type="button" className="link-btn" onClick={onRun} disabled={busy}>
+          Run assessment →
+        </button>
+      )
+  }
+}
+
+function CompatibleCard({ container, state, busy, onToggleSelected, onRun }) {
+  return (
+    <div className="target-card">
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+        <input
+          type="checkbox"
+          checked={state.selected}
+          disabled={busy}
+          onChange={() => onToggleSelected(container.name)}
+          style={{ marginTop: '0.3rem' }}
+        />
+        <div style={{ flex: 1 }}>
+          <div className="target-card__title mono">{container.name}</div>
+          {state.osLabel && <div className="hint" style={{ marginBottom: '0.5rem' }}>{state.osLabel}</div>}
+        </div>
+      </div>
+      <div style={{ marginTop: '0.5rem' }}>
+        <AssessAction state={state} busy={busy} onRun={() => onRun(container)} />
+      </div>
+    </div>
+  )
+}
+
+function UncheckedCard({ container, busy, onRun }) {
   return (
     <div className="target-card">
       <div className="target-card__title mono">{container.name}</div>
       <div className="hint" style={{ marginBottom: '0.75rem' }}>{container.image}</div>
-      <button
-        type="button"
-        className="link-btn"
-        onClick={() => onRunAssessment(container)}
-        disabled={assessing}
-      >
-        {assessing ? 'Running…' : 'Run assessment →'}
+      <button type="button" className="link-btn" onClick={() => onRun(container)} disabled={busy}>
+        Run assessment →
       </button>
+    </div>
+  )
+}
+
+function InfoCard({ container, reason }) {
+  return (
+    <div className="target-card">
+      <div className="target-card__title mono">{container.name}</div>
+      <div className="hint">{reason}</div>
     </div>
   )
 }
@@ -29,7 +126,8 @@ export default function Containers({ apiFetch, username, onLogout }) {
   const [containers, setContainers] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(null)
-  const [assessingName, setAssessingName] = useState(null)
+  const [compat, setCompat] = useState({}) // name -> state (see defaultState())
+  const [busy, setBusy] = useState(false)
   // null = container list. Otherwise:
   //   {kind:'assess-result', container, findings}
   //   {kind:'finding-detail', container, findings, finding}
@@ -47,21 +145,116 @@ export default function Containers({ apiFetch, username, onLogout }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function handleRunAssessment(container) {
-    setAssessingName(container.name)
+  function setContainerState(name, patch) {
+    setCompat((prev) => ({ ...prev, [name]: { ...(prev[name] ?? defaultState()), ...patch } }))
+  }
+
+  const checked = Object.keys(compat).length > 0
+  const supported = containers.filter((c) => compat[c.name]?.checkStatus === 'supported')
+  const unsupported = containers.filter((c) => compat[c.name]?.checkStatus === 'unsupported')
+  const checking = containers.filter((c) => compat[c.name]?.checkStatus === 'checking')
+  const checkFailed = containers.filter((c) => compat[c.name]?.checkStatus === 'error')
+  const selectedCount = supported.filter((c) => compat[c.name]?.selected).length
+
+  async function handleCheckCompatibility() {
+    if (busy || containers.length === 0) return
+    setBusy(true)
+    setError(null)
+    setCompat(() => {
+      const next = {}
+      for (const c of containers) next[c.name] = { ...defaultState(), checkStatus: 'checking' }
+      return next
+    })
+    await runWithConcurrency(
+      containers,
+      async (c) => {
+        const response = await apiFetch(`/api/containers/${c.name}/check`)
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.json()
+      },
+      Math.max(1, containers.length),
+      (c, settled) => {
+        if (settled.status === 'fulfilled') {
+          const r = settled.value
+          setContainerState(c.name, {
+            checkStatus: r.testable ? 'supported' : 'unsupported',
+            osLabel: r.os_id ? `${r.os_id} ${r.os_version_id ?? ''}`.trim() : null,
+            reason: r.reason,
+            selected: false, // opt-in -- never pre-checked, even for compatible containers
+          })
+        } else {
+          setContainerState(c.name, { checkStatus: 'error', reason: settled.reason.message })
+        }
+      },
+    )
+    setBusy(false)
+  }
+
+  function toggleSelected(name) {
+    if (busy) return
+    setContainerState(name, { selected: !compat[name]?.selected })
+  }
+
+  async function assessContainer(container) {
+    setContainerState(container.name, { assessmentStatus: 'running', findings: null, assessError: null })
+    const response = await apiFetch(`/api/assess/${container.name}`, { method: 'POST' })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      throw new Error(body.detail ?? `HTTP ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async function handleAssessOne(container) {
+    if (busy) return
+    setBusy(true)
     setError(null)
     try {
-      const response = await apiFetch(`/api/assess/${container.name}`, { method: 'POST' })
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}))
-        throw new Error(body.detail ?? `HTTP ${response.status}`)
-      }
-      const findings = await response.json()
+      const findings = await assessContainer(container)
+      setContainerState(container.name, { assessmentStatus: 'success', findings })
       setDetail({ kind: 'assess-result', container, findings })
     } catch (err) {
+      setContainerState(container.name, { assessmentStatus: 'error', assessError: err.message })
       setError(err.message)
     } finally {
-      setAssessingName(null)
+      setBusy(false)
+    }
+  }
+
+  function handleRunSelected() {
+    if (busy) return
+    const targets = supported.filter((c) => compat[c.name]?.selected)
+    if (targets.length === 0) return
+    setBusy(true)
+    setError(null)
+    for (const c of targets) {
+      setContainerState(c.name, { assessmentStatus: 'queued', findings: null, assessError: null })
+    }
+    runWithConcurrency(
+      targets,
+      (c) => assessContainer(c),
+      RUN_SELECTED_CONCURRENCY,
+      (c, settled) => {
+        if (settled.status === 'fulfilled') {
+          setContainerState(c.name, { assessmentStatus: 'success', findings: settled.value })
+        } else {
+          setContainerState(c.name, { assessmentStatus: 'error', assessError: settled.reason.message })
+        }
+      },
+    ).finally(() => setBusy(false))
+  }
+
+  function openReport(container) {
+    const state = compat[container.name]
+    if (state?.findings) setDetail({ kind: 'assess-result', container, findings: state.findings })
+  }
+
+  function handleCardAction(container) {
+    const state = compat[container.name]
+    if (state?.assessmentStatus === 'success') {
+      openReport(container)
+    } else {
+      handleAssessOne(container)
     }
   }
 
@@ -85,19 +278,75 @@ export default function Containers({ apiFetch, username, onLogout }) {
 
       {!detail && (
         <>
-          <h2>Containers ({containers.length})</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <h2 style={{ margin: 0 }}>Containers ({containers.length})</h2>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button type="button" className="btn-secondary" onClick={handleCheckCompatibility} disabled={busy || containers.length === 0}>
+                Check compatibility
+              </button>
+              {checked && (
+                <button type="button" className="btn-primary" style={{ width: 'auto' }} onClick={handleRunSelected} disabled={busy || selectedCount === 0}>
+                  Run selected ({selectedCount})
+                </button>
+              )}
+            </div>
+          </div>
+
           {!loaded && <p className="hint">Loading…</p>}
           {loaded && containers.length === 0 && <p className="hint">No containers found on this host.</p>}
-          <div className="card-grid">
-            {containers.map((container) => (
-              <ContainerCard
-                key={container.name}
-                container={container}
-                assessing={assessingName === container.name}
-                onRunAssessment={handleRunAssessment}
-              />
-            ))}
-          </div>
+
+          {!checked && (
+            <div className="card-grid" style={{ marginTop: '1rem' }}>
+              {containers.map((container) => (
+                <UncheckedCard key={container.name} container={container} busy={busy} onRun={handleCardAction} />
+              ))}
+            </div>
+          )}
+
+          {checked && (
+            <>
+              {checking.length > 0 && <p className="hint">Verificando compatibilidade… ({checking.length} restantes)</p>}
+
+              <h4 className="finding-group" style={{ marginTop: '1.5rem' }}>Compatíveis ({supported.length})</h4>
+              {supported.length === 0 && <p className="hint">Nenhum container compatível encontrado.</p>}
+              <div className="card-grid">
+                {supported.map((container) => (
+                  <CompatibleCard
+                    key={container.name}
+                    container={container}
+                    state={compat[container.name]}
+                    busy={busy}
+                    onToggleSelected={toggleSelected}
+                    onRun={handleCardAction}
+                  />
+                ))}
+              </div>
+
+              {unsupported.length > 0 && (
+                <>
+                  <h4 className="finding-group" style={{ marginTop: '1.5rem' }}>Não compatíveis ({unsupported.length})</h4>
+                  <div className="card-grid">
+                    {unsupported.map((container) => (
+                      <InfoCard key={container.name} container={container} reason={compat[container.name]?.reason} />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {checkFailed.length > 0 && (
+                <>
+                  <h4 className="finding-group finding-group--warning" style={{ marginTop: '1.5rem' }}>
+                    Falha na verificação ({checkFailed.length})
+                  </h4>
+                  <div className="card-grid">
+                    {checkFailed.map((container) => (
+                      <InfoCard key={container.name} container={container} reason={compat[container.name]?.reason} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </>
       )}
 

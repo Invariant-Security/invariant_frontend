@@ -69,8 +69,12 @@ export function EvidenceChain({ finding }) {
 }
 
 export function FindingsReport({ title, findings, onSelectFinding, onBack, apiFetch }) {
+  // Explicit filters, not "anything not FAIL is PASS" -- today's pipeline
+  // only ever produces PASS/FAIL, but the count must not silently misstate
+  // the total if a third status (e.g. "NOT ASSESSED") ever shows up.
   const failed = findings.filter((f) => f.status === 'FAIL')
   const passed = findings.filter((f) => f.status === 'PASS')
+  const other = findings.filter((f) => f.status !== 'FAIL' && f.status !== 'PASS')
   const [exporting, setExporting] = useState(null) // 'ceo' | 'technical' | null
 
   async function handleExportPdf(kind) {
@@ -104,6 +108,7 @@ export function FindingsReport({ title, findings, onSelectFinding, onBack, apiFe
       <div className="card__counts">
         <span className="badge badge--pass">{passed.length} PASS</span>
         <span className="badge badge--fail">{failed.length} FAIL</span>
+        {other.length > 0 && <span className="badge badge--na">{other.length} N/A</span>}
       </div>
       <div style={{ display: 'flex', gap: '0.75rem', margin: '0.75rem 0 1rem' }}>
         <button type="button" className="link-btn" onClick={() => handleExportPdf('ceo')} disabled={exporting !== null}>
