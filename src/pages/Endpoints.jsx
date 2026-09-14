@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
 import { FindingsReport, FindingDetail } from '../findings.jsx'
+import { formatOsDisplayFromParts, formatTargetLabel } from '../targetLabel.js'
 import './Console.css'
 import './Findings.css'
 
 // Escopo desta tela: cadastrar endpoints (IP único ou CIDR), disparar a
-// identificação (windows/linux/docker/waf/firewall/vmware) e rodar um
-// assessment CIS real via SSH contra o que foi descoberto (POST
-// /endpoints/{id}/assess, invariant_api/routes/endpoints.py).
+// identificação de rede (windows/linux/docker/waf/firewall/vmware, via
+// invariant_discovery -- POST /endpoints/{id}/discover), depois um pré-flight
+// barato (POST /endpoints/{id}/check -- identifica target_type/hostname/OS
+// antes de comprometer um assessment real, mesma ideia do "Check
+// compatibility" de Containers.jsx) e por fim o assessment CIS real via SSH
+// (POST /endpoints/{id}/assess). "Check" e "Run assessment" reaproveitam o
+// mesmo formulário de credenciais -- SSH não tem pré-flight sem credencial
+// como o docker-exec tem.
 
 function ClassificationBadge({ classification, confidence }) {
   if (!classification) return <span className="badge badge--unknown">not scanned</span>
@@ -18,11 +24,17 @@ function ClassificationBadge({ classification, confidence }) {
   )
 }
 
-function EndpointCard({ endpoint, discovering, onDiscover, onDelete, onViewResults, onRunAssessment }) {
+function EndpointCard({ endpoint, checkResult, discovering, onDiscover, onDelete, onViewResults, onRunAssessment }) {
+  const targetLabel = checkResult?.testable
+    ? formatTargetLabel('linux_host', formatOsDisplayFromParts(checkResult.os_id, checkResult.os_version_id), {
+        primaryIp: checkResult.primary_ip,
+      })
+    : null
   return (
     <div className="target-card">
       <div className="target-card__title mono">{endpoint.address}</div>
       {endpoint.label && <div className="hint" style={{ marginBottom: '0.5rem' }}>{endpoint.label}</div>}
+      {targetLabel && <div className="hint" style={{ marginBottom: '0.5rem' }}>{targetLabel}</div>}
       <div style={{ marginBottom: '0.75rem' }}>
         <ClassificationBadge classification={endpoint.classification} confidence={endpoint.confidence} />
       </div>
@@ -97,14 +109,22 @@ function AssessForm({
   keyMaterial,
   password,
   assessing,
+  checking,
+  checkResult,
   onPortChange,
   onUsernameChange,
   onAuthMethodChange,
   onKeyMaterialChange,
   onPasswordChange,
   onSubmit,
+  onCheck,
   onBack,
 }) {
+  const targetLabel = checkResult?.testable
+    ? formatTargetLabel('linux_host', formatOsDisplayFromParts(checkResult.os_id, checkResult.os_version_id), {
+        primaryIp: checkResult.primary_ip,
+      })
+    : null
   return (
     <section>
       <button type="button" className="link-btn" onClick={onBack}>
@@ -112,6 +132,11 @@ function AssessForm({
       </button>
       <h2 className="mono">Run assessment — {endpoint.address}</h2>
       <p className="hint">Credentials are used once for this request and never stored.</p>
+      {checkResult && (
+        <p className={`hint ${checkResult.testable ? '' : 'error'}`} style={{ marginBottom: '1rem' }}>
+          {checkResult.testable ? targetLabel : `Not testable: ${checkResult.reason ?? 'unknown reason'}`}
+        </p>
+      )}
       <form className="endpoint-form" onSubmit={onSubmit}>
         <div className="field">
           <label htmlFor="assess-port">Port</label>
@@ -171,9 +196,25 @@ function AssessForm({
             />
           </div>
         )}
-        <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '0.55rem 1.2rem' }} disabled={assessing}>
-          {assessing ? 'Running…' : 'Run assessment'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            style={{ width: 'auto', padding: '0.55rem 1.2rem' }}
+            onClick={onCheck}
+            disabled={assessing || checking}
+          >
+            {checking ? 'Checking…' : 'Check'}
+          </button>
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ width: 'auto', padding: '0.55rem 1.2rem' }}
+            disabled={assessing || checking}
+          >
+            {assessing ? 'Running…' : 'Run assessment'}
+          </button>
+        </div>
       </form>
     </section>
   )
@@ -198,6 +239,11 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
   const [assessKeyMaterial, setAssessKeyMaterial] = useState('')
   const [assessPassword, setAssessPassword] = useState('')
   const [assessing, setAssessing] = useState(false)
+  const [checking, setChecking] = useState(false)
+  // endpoint id -> last /check response -- lifted to the parent (not just
+  // detail.checkResult) so a card in the list view can keep showing the
+  // label after the form is closed, same idea as Containers.jsx's `compat`.
+  const [checkResults, setCheckResults] = useState({})
 
   async function loadEndpoints() {
     const response = await apiFetch('/api/endpoints')
@@ -275,7 +321,40 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
     setAssessKeyMaterial('')
     setAssessPassword('')
     setError(null)
-    setDetail({ kind: 'assess-form', endpoint })
+    setDetail({ kind: 'assess-form', endpoint, checkResult: checkResults[endpoint.id] ?? null })
+  }
+
+  async function handleCheck(e) {
+    e.preventDefault()
+    setError(null)
+    setChecking(true)
+    const endpoint = detail.endpoint
+    try {
+      const response = await apiFetch(`/api/endpoints/${endpoint.id}/check`, {
+        method: 'POST',
+        body: JSON.stringify({
+          port: Number(assessPort) || 22,
+          username: assessUsername,
+          auth_method: assessAuthMethod,
+          key_material: assessAuthMethod === 'key' ? assessKeyMaterial : null,
+          password: assessAuthMethod === 'password' ? assessPassword : null,
+        }),
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.detail ?? `HTTP ${response.status}`)
+      }
+      const result = await response.json()
+      setCheckResults((prev) => ({ ...prev, [endpoint.id]: result }))
+      setDetail((prev) => (prev?.kind === 'assess-form' ? { ...prev, checkResult: result } : prev))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      // Same "used once, never retained" posture as the assess submit below.
+      setAssessKeyMaterial('')
+      setAssessPassword('')
+      setChecking(false)
+    }
   }
 
   async function handleSubmitAssess(e) {
@@ -299,7 +378,16 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
         throw new Error(body.detail ?? `HTTP ${response.status}`)
       }
       const findings = await response.json()
-      setDetail({ kind: 'assess-result', endpoint, findings })
+      // primary_ip is always the endpoint's own stored address (known
+      // regardless of whether Check ran first); hostname only exists if
+      // Check was run in this same form session -- never invented otherwise.
+      setDetail({
+        kind: 'assess-result',
+        endpoint,
+        findings,
+        hostname: detail.checkResult?.hostname ?? null,
+        primaryIp: endpoint.address,
+      })
     } catch (err) {
       setError(err.message)
       // stays on 'assess-form' so port/username don't need to be retyped
@@ -315,6 +403,9 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
       <header className="site-header">
         <div className="brand">INVARIANT</div>
         <div className="session-info">
+          <a href="/containers" className="link-btn">
+            Containers
+          </a>
           <span>{username}</span>
           <button type="button" className="btn-secondary" onClick={onLogout}>
             Log out
@@ -330,7 +421,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
 
       {!detail && (
         <>
-          <h2>Add endpoint</h2>
+          <h2>Add Linux host</h2>
           <form className="endpoint-form" onSubmit={handleAddEndpoint}>
             <div className="field">
               <label htmlFor="address">IP or CIDR range</label>
@@ -352,16 +443,17 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
             </button>
           </form>
 
-          <h2>Endpoints ({endpoints.length})</h2>
+          <h2>Linux Hosts ({endpoints.length})</h2>
           {!loaded && <p className="hint">Loading…</p>}
           {loaded && endpoints.length === 0 && (
-            <p className="hint">No endpoints yet -- add one above, then click Discover to identify it.</p>
+            <p className="hint">No hosts yet -- add one above, then click Discover to identify it.</p>
           )}
           <div className="card-grid">
             {endpoints.map((endpoint) => (
               <EndpointCard
                 key={endpoint.id}
                 endpoint={endpoint}
+                checkResult={checkResults[endpoint.id]}
                 discovering={discoveringId === endpoint.id}
                 onDiscover={handleDiscover}
                 onDelete={handleDelete}
@@ -385,12 +477,15 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
           keyMaterial={assessKeyMaterial}
           password={assessPassword}
           assessing={assessing}
+          checking={checking}
+          checkResult={detail.checkResult}
           onPortChange={setAssessPort}
           onUsernameChange={setAssessUsername}
           onAuthMethodChange={setAssessAuthMethod}
           onKeyMaterialChange={setAssessKeyMaterial}
           onPasswordChange={setAssessPassword}
           onSubmit={handleSubmitAssess}
+          onCheck={handleCheck}
           onBack={() => setDetail(null)}
         />
       )}
@@ -399,6 +494,8 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
           title={detail.endpoint.address}
           findings={detail.findings}
           apiFetch={apiFetch}
+          hostname={detail.hostname}
+          primaryIp={detail.primaryIp}
           onSelectFinding={(finding) =>
             setDetail({ kind: 'finding-detail', endpoint: detail.endpoint, findings: detail.findings, finding })
           }

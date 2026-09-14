@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { runWithConcurrency } from '../containerBatch.js'
 import { FindingsReport, FindingDetail } from '../findings.jsx'
+import { formatOsDisplayFromParts, formatTargetLabel } from '../targetLabel.js'
 import './Console.css'
 import './Findings.css'
 
@@ -30,7 +31,8 @@ const RUN_SELECTED_CONCURRENCY = 2
 function defaultState() {
   return {
     checkStatus: 'idle', // 'idle' | 'checking' | 'supported' | 'unsupported' | 'error'
-    osLabel: null,
+    os_id: null,
+    os_version_id: null,
     reason: null,
     selected: false,
     assessmentStatus: 'idle', // 'idle' | 'queued' | 'running' | 'success' | 'error'
@@ -79,6 +81,8 @@ function AssessAction({ state, busy, onRun }) {
 }
 
 function CompatibleCard({ container, state, busy, onToggleSelected, onRun }) {
+  const osDisplay = formatOsDisplayFromParts(state.os_id, state.os_version_id)
+  const label = formatTargetLabel('docker_container', osDisplay, { containerImage: container.image })
   return (
     <div className="target-card">
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
@@ -91,7 +95,7 @@ function CompatibleCard({ container, state, busy, onToggleSelected, onRun }) {
         />
         <div style={{ flex: 1 }}>
           <div className="target-card__title mono">{container.name}</div>
-          {state.osLabel && <div className="hint" style={{ marginBottom: '0.5rem' }}>{state.osLabel}</div>}
+          <div className="hint" style={{ marginBottom: '0.5rem' }}>{label}</div>
         </div>
       </div>
       <div style={{ marginTop: '0.5rem' }}>
@@ -186,7 +190,8 @@ export default function Containers({ apiFetch, username, onLogout }) {
           const r = settled.value
           setContainerState(c.name, {
             checkStatus: r.testable ? 'supported' : 'unsupported',
-            osLabel: r.os_id ? `${r.os_id} ${r.os_version_id ?? ''}`.trim() : null,
+            os_id: r.os_id,
+            os_version_id: r.os_version_id,
             reason: r.reason,
             selected: false, // opt-in -- never pre-checked, even for compatible containers
           })
@@ -308,6 +313,9 @@ export default function Containers({ apiFetch, username, onLogout }) {
       <header className="site-header">
         <div className="brand">INVARIANT</div>
         <div className="session-info">
+          <a href="/endpoints" className="link-btn">
+            Linux Hosts
+          </a>
           <span>{username}</span>
           <button type="button" className="btn-secondary" onClick={onLogout}>
             Log out
@@ -410,6 +418,7 @@ export default function Containers({ apiFetch, username, onLogout }) {
           title={detail.container.name}
           findings={detail.findings}
           apiFetch={apiFetch}
+          containerImage={detail.container.image}
           onSelectFinding={(finding) =>
             setDetail({ kind: 'finding-detail', container: detail.container, findings: detail.findings, finding })
           }

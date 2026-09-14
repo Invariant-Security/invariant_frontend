@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatOsDisplay, formatTargetLabel } from './targetLabel.js'
 
 // Renderização de Finding compartilhada entre Demo.jsx (/demo, pública) e
 // Endpoints.jsx/Containers.jsx (console autenticado -- fluxo "Run
@@ -68,7 +69,7 @@ export function EvidenceChain({ finding }) {
   )
 }
 
-export function FindingsReport({ title, findings, onSelectFinding, onBack, apiFetch }) {
+export function FindingsReport({ title, findings, onSelectFinding, onBack, apiFetch, hostname, primaryIp, containerImage }) {
   // Explicit filters, not "anything not FAIL is PASS" -- today's pipeline
   // only ever produces PASS/FAIL, but the count must not silently misstate
   // the total if a third status (e.g. "NOT ASSESSED") ever shows up.
@@ -77,12 +78,22 @@ export function FindingsReport({ title, findings, onSelectFinding, onBack, apiFe
   const other = findings.filter((f) => f.status !== 'FAIL' && f.status !== 'PASS')
   const [exporting, setExporting] = useState(null) // 'ceo' | 'technical' | null
 
+  // Same rule reports.py's _format_target_label uses, so this screen and
+  // the exported PDF cover always agree -- hostname/primaryIp are only
+  // ever shown when the finding set is actually target_type=linux_host.
+  const targetLabel = findings[0]
+    ? formatTargetLabel(findings[0].target_type, formatOsDisplay(findings[0].document_name), {
+        primaryIp,
+        containerImage,
+      })
+    : null
+
   async function handleExportPdf(kind) {
     setExporting(kind)
     try {
       const response = await apiFetch('/api/reports/pdf', {
         method: 'POST',
-        body: JSON.stringify({ title, kind, findings }),
+        body: JSON.stringify({ title, kind, findings, hostname, primaryIp, containerImage }),
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const blob = await response.blob()
@@ -105,6 +116,7 @@ export function FindingsReport({ title, findings, onSelectFinding, onBack, apiFe
         ← Back
       </button>
       <h2 className="mono">{title}</h2>
+      {targetLabel && <p className="hint" style={{ marginTop: '-0.5rem' }}>{targetLabel}</p>}
       <div className="card__counts">
         <span className="badge badge--pass">{passed.length} PASS</span>
         <span className="badge badge--fail">{failed.length} FAIL</span>
