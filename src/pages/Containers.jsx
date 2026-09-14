@@ -86,7 +86,12 @@ function AssessAction({ state, busy, onRun }) {
 
 function CompatibleCard({ container, state, busy, onToggleSelected, onRun }) {
   const osDisplay = formatOsDisplayFromParts(state.os_id, state.os_version_id)
-  const label = formatTargetLabel('docker_container', osDisplay, { containerImage: container.image })
+  // Deliberately no containerImage here -- a real image reference
+  // (registry/repo:digest) can run well past a grid card's width and
+  // overflow into the next one. "Docker container · Debian 13" is
+  // always short and predictable; the full image is still shown
+  // elsewhere (the report view) where there's room for it.
+  const label = formatTargetLabel('docker_container', osDisplay)
 
   // Clicking anywhere on the card body toggles selection -- the checkbox
   // and the AssessAction buttons below each stop propagation so they keep
