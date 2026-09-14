@@ -15,6 +15,7 @@
   --red: #ff6b6b;
   --amber: #ffcc66;
   --blue: #6ea8fe;
+  --blue-tint: rgba(110, 168, 254, 0.1);
 }
 
 @media (prefers-color-scheme: light) {
@@ -28,6 +29,7 @@
     --red: #b91c1c;
     --amber: #92400e;
     --blue: #1d4ed8;
+    --blue-tint: rgba(29, 77, 216, 0.08);
   }
 }
 
@@ -266,6 +268,20 @@ h2 {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1rem;
+}
+
+.target-card--selectable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.target-card--selectable:hover {
+  border-color: var(--blue);
+}
+
+.target-card--selected {
+  border-color: var(--blue);
+  background: var(--blue-tint);
 }
 
 .target-card__title {

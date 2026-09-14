@@ -67,14 +67,14 @@ function AssessAction({ state, busy, onRun }) {
             {state.assessError}
           </p>
           <button type="button" className="link-btn" onClick={onRun} disabled={busy}>
-            Retry →
+            Tentar novamente
           </button>
         </div>
       )
     default:
       return (
         <button type="button" className="link-btn" onClick={onRun} disabled={busy}>
-          Run assessment →
+          Executar avaliação →
         </button>
       )
   }
@@ -83,14 +83,29 @@ function AssessAction({ state, busy, onRun }) {
 function CompatibleCard({ container, state, busy, onToggleSelected, onRun }) {
   const osDisplay = formatOsDisplayFromParts(state.os_id, state.os_version_id)
   const label = formatTargetLabel('docker_container', osDisplay, { containerImage: container.image })
+
+  // Clicking anywhere on the card body toggles selection -- the checkbox
+  // and the AssessAction buttons below each stop propagation so they keep
+  // their own independent behavior instead of also toggling selection.
+  // The checkbox stays the keyboard-accessible way to (de)select; this is
+  // a mouse-convenience layer on top, not a replacement for it.
+  function handleCardClick() {
+    if (busy) return
+    onToggleSelected(container.name)
+  }
+
   return (
-    <div className="target-card">
+    <div
+      className={`target-card target-card--selectable ${state.selected ? 'target-card--selected' : ''}`}
+      onClick={handleCardClick}
+    >
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
         <input
           type="checkbox"
           checked={state.selected}
           disabled={busy}
           onChange={() => onToggleSelected(container.name)}
+          onClick={(e) => e.stopPropagation()}
           style={{ marginTop: '0.3rem' }}
         />
         <div style={{ flex: 1 }}>
@@ -98,7 +113,7 @@ function CompatibleCard({ container, state, busy, onToggleSelected, onRun }) {
           <div className="hint" style={{ marginBottom: '0.5rem' }}>{label}</div>
         </div>
       </div>
-      <div style={{ marginTop: '0.5rem' }}>
+      <div style={{ marginTop: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
         <AssessAction state={state} busy={busy} onRun={() => onRun(container)} />
       </div>
     </div>
@@ -111,7 +126,7 @@ function UncheckedCard({ container, busy, onRun }) {
       <div className="target-card__title mono">{container.name}</div>
       <div className="hint" style={{ marginBottom: '0.75rem' }}>{container.image}</div>
       <button type="button" className="link-btn" onClick={() => onRun(container)} disabled={busy}>
-        Run assessment →
+        Executar avaliação →
       </button>
     </div>
   )
@@ -318,7 +333,7 @@ export default function Containers({ apiFetch, username, onLogout }) {
           </a>
           <span>{username}</span>
           <button type="button" className="btn-secondary" onClick={onLogout}>
-            Log out
+            Sair
           </button>
         </div>
       </header>
@@ -335,28 +350,29 @@ export default function Containers({ apiFetch, username, onLogout }) {
             <h2 style={{ margin: 0 }}>Containers ({containers.length})</h2>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button type="button" className="btn-secondary" onClick={handleCheckCompatibility} disabled={busy || containers.length === 0}>
-                Check compatibility
+                Verificar compatibilidade
               </button>
-              {checked && (
-                <button type="button" className="btn-primary" style={{ width: 'auto' }} onClick={handleRunSelected} disabled={busy || selectedCount === 0}>
-                  Run selected ({selectedCount})
-                </button>
-              )}
-              {batchCompleted && (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={handleExportConsolidated}
-                  disabled={busy || exportingConsolidated}
-                >
-                  {exportingConsolidated ? 'Exportando…' : 'Export consolidated report'}
-                </button>
-              )}
+              <button type="button" className="btn-primary" style={{ width: 'auto' }} onClick={handleRunSelected} disabled={busy || selectedCount === 0}>
+                Executar selecionados ({selectedCount})
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleExportConsolidated}
+                disabled={busy || exportingConsolidated || !batchCompleted}
+                title={
+                  !batchCompleted
+                    ? 'Execute a avaliação dos containers selecionados antes de exportar o relatório consolidado.'
+                    : undefined
+                }
+              >
+                {exportingConsolidated ? 'Exportando…' : 'Exportar relatório consolidado'}
+              </button>
             </div>
           </div>
 
-          {!loaded && <p className="hint">Loading…</p>}
-          {loaded && containers.length === 0 && <p className="hint">No containers found on this host.</p>}
+          {!loaded && <p className="hint">Carregando…</p>}
+          {loaded && containers.length === 0 && <p className="hint">Nenhum container encontrado neste host.</p>}
 
           {!checked && (
             <div className="card-grid" style={{ marginTop: '1rem' }}>
