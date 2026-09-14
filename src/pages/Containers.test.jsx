@@ -12,7 +12,7 @@ import Containers from './Containers.jsx'
 // "found multiple elements" the moment more than one test has rendered.
 afterEach(cleanup)
 
-function makeApiFetch({ containers = [{ name: 'tamois', image: 'tamois-img' }], checkResult = {} } = {}) {
+function makeApiFetch({ containers = [{ name: 'tamois', image: 'tamois-img' }], checkResult = {}, findings = [] } = {}) {
   return vi.fn(async (path) => {
     if (path === '/api/containers') {
       return { ok: true, json: async () => containers }
@@ -23,16 +23,33 @@ function makeApiFetch({ containers = [{ name: 'tamois', image: 'tamois-img' }], 
         json: async () => ({ testable: true, os_id: 'debian', os_version_id: '12', reason: null, ...checkResult }),
       }
     }
+    if (path.startsWith('/api/assess/')) {
+      return { ok: true, json: async () => findings }
+    }
     return { ok: true, json: async () => ({}) }
   })
+}
+
+function headingMatcher(text) {
+  return (name) => name.replace(/\s+/g, '') === text.replace(/\s+/g, '')
 }
 
 async function renderCheckedContainers(options) {
   const apiFetch = makeApiFetch(options)
   render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
-  await waitFor(() => screen.getByRole('heading', { name: (name) => name.replace(/\s+/g, '') === 'Containers(1)' }))
+  await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (1)') }))
   fireEvent.click(screen.getByText('Verificar compatibilidade'))
   await waitFor(() => screen.getByText('tamois'))
+  return apiFetch
+}
+
+async function renderCheckedMultiple(names) {
+  const containers = names.map((name) => ({ name, image: `${name}-img` }))
+  const apiFetch = makeApiFetch({ containers })
+  render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+  await waitFor(() => screen.getByRole('heading', { name: headingMatcher(`Containers (${names.length})`) }))
+  fireEvent.click(screen.getByText('Verificar compatibilidade'))
+  await waitFor(() => names.forEach((name) => screen.getByText(name)))
   return apiFetch
 }
 
@@ -73,6 +90,33 @@ describe('Containers -- botão de exportar consolidado', () => {
     const exportBtn = screen.getByText('Exportar relatório consolidado')
     expect(exportBtn.disabled).toBe(true)
     expect(exportBtn.title).not.toBe('')
+  })
+
+  it('continua desabilitado quando o lote executado teve só 1 container, mesmo já concluído', async () => {
+    await renderCheckedMultiple(['tamois'])
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByText(/Executar selecionados/))
+
+    await waitFor(() => {
+      const btn = screen.getByText('Exportar relatório consolidado')
+      if (!btn.title.includes('pelo menos dois')) throw new Error('lote ainda não terminou')
+    })
+
+    const exportBtn = screen.getByText('Exportar relatório consolidado')
+    expect(exportBtn.disabled).toBe(true)
+  })
+
+  it('habilita quando o lote executado teve 2 ou mais containers', async () => {
+    await renderCheckedMultiple(['tamois', 'babybet'])
+    const checkboxes = screen.getAllByRole('checkbox')
+    fireEvent.click(checkboxes[0])
+    fireEvent.click(checkboxes[1])
+    fireEvent.click(screen.getByText(/Executar selecionados/))
+
+    await waitFor(() => {
+      const btn = screen.getByText('Exportar relatório consolidado')
+      expect(btn.disabled).toBe(false)
+    })
   })
 })
 

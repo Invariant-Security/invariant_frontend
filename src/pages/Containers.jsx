@@ -27,6 +27,10 @@ import './Findings.css'
 // lote criaria um terceiro assessment simultâneo contra produção.
 
 const RUN_SELECTED_CONCURRENCY = 2
+// A consolidated report compares prevalence/compliance across a fleet --
+// with a single asset there's nothing to compare, so the export button
+// stays disabled below this count even after the batch finishes.
+const MIN_CONSOLIDATED_TARGETS = 2
 
 function defaultState() {
   return {
@@ -180,6 +184,16 @@ export default function Containers({ apiFetch, username, onLogout }) {
   const checking = containers.filter((c) => compat[c.name]?.checkStatus === 'checking')
   const checkFailed = containers.filter((c) => compat[c.name]?.checkStatus === 'error')
   const selectedCount = supported.filter((c) => compat[c.name]?.selected).length
+  // Gated on lastBatchTargets (the batch that actually ran, and whose
+  // findings would be exported), not the live `selectedCount` -- the
+  // checkboxes can change after "Executar selecionados" runs, and the
+  // export button's enablement must track what was actually assessed,
+  // not whatever happens to be checked right now.
+  const exportDisabledReason = !batchCompleted
+    ? 'Execute a avaliação dos containers selecionados antes de exportar o relatório consolidado.'
+    : lastBatchTargets.length < MIN_CONSOLIDATED_TARGETS
+      ? 'Selecione e execute a avaliação de pelo menos dois containers antes de exportar o relatório consolidado.'
+      : null
 
   async function handleCheckCompatibility() {
     if (busy || containers.length === 0) return
@@ -359,12 +373,8 @@ export default function Containers({ apiFetch, username, onLogout }) {
                 type="button"
                 className="btn-secondary"
                 onClick={handleExportConsolidated}
-                disabled={busy || exportingConsolidated || !batchCompleted}
-                title={
-                  !batchCompleted
-                    ? 'Execute a avaliação dos containers selecionados antes de exportar o relatório consolidado.'
-                    : undefined
-                }
+                disabled={busy || exportingConsolidated || exportDisabledReason !== null}
+                title={exportDisabledReason ?? undefined}
               >
                 {exportingConsolidated ? 'Exportando…' : 'Exportar relatório consolidado'}
               </button>
