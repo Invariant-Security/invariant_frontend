@@ -156,11 +156,6 @@ export default function Containers({ apiFetch, username, onLogout }) {
   const [error, setError] = useState(null)
   const [compat, setCompat] = useState({}) // name -> state (see defaultState())
   const [busy, setBusy] = useState(false)
-  // true only once a "Run selected" batch has fully finished -- gates the
-  // consolidated export so it can never fire against a still-running or
-  // stale batch (a fresh Check compatibility invalidates it again).
-  const [batchCompleted, setBatchCompleted] = useState(false)
-  const [lastBatchTargets, setLastBatchTargets] = useState([])
   const [exportingConsolidated, setExportingConsolidated] = useState(false)
   // null = container list. Otherwise:
   //   {kind:'assess-result', container, findings}
@@ -189,23 +184,24 @@ export default function Containers({ apiFetch, username, onLogout }) {
   const checking = containers.filter((c) => compat[c.name]?.checkStatus === 'checking')
   const checkFailed = containers.filter((c) => compat[c.name]?.checkStatus === 'error')
   const selectedCount = supported.filter((c) => compat[c.name]?.selected).length
-  // Gated on lastBatchTargets (the batch that actually ran, and whose
-  // findings would be exported), not the live `selectedCount` -- the
-  // checkboxes can change after "Executar selecionados" runs, and the
-  // export button's enablement must track what was actually assessed,
-  // not whatever happens to be checked right now.
-  const exportDisabledReason = !batchCompleted
-    ? 'Execute a avaliação dos containers selecionados antes de exportar o relatório consolidado.'
-    : lastBatchTargets.length < MIN_CONSOLIDATED_TARGETS
-      ? 'Selecione e execute a avaliação de pelo menos dois containers antes de exportar o relatório consolidado.'
+  // Live selection, not a frozen batch snapshot: any container currently
+  // checked AND already successfully assessed counts, regardless of
+  // whether that assessment came from "Executar selecionados" or a
+  // standalone "Executar avaliação →". Unchecking a container after it was
+  // counted removes it immediately -- there's no notion of "the last batch
+  // that ran" anymore.
+  const readyToExport = supported.filter(
+    (c) => compat[c.name]?.selected && compat[c.name]?.assessmentStatus === 'success',
+  )
+  const exportDisabledReason =
+    readyToExport.length < MIN_CONSOLIDATED_TARGETS
+      ? 'Selecione pelo menos dois containers já avaliados (com relatório individual) para exportar o relatório consolidado.'
       : null
 
   async function handleCheckCompatibility() {
     if (busy || containers.length === 0) return
     setBusy(true)
     setError(null)
-    setBatchCompleted(false) // any previous batch's results are about to be wiped
-    setLastBatchTargets([])
     setCompat(() => {
       const next = {}
       for (const c of containers) next[c.name] = { ...defaultState(), checkStatus: 'checking' }
@@ -273,8 +269,6 @@ export default function Containers({ apiFetch, username, onLogout }) {
     const targets = supported.filter((c) => compat[c.name]?.selected)
     if (targets.length === 0) return
     setBusy(true)
-    setBatchCompleted(false)
-    setLastBatchTargets(targets)
     setError(null)
     for (const c of targets) {
       setContainerState(c.name, { assessmentStatus: 'queued', findings: null, assessError: null })
@@ -292,7 +286,6 @@ export default function Containers({ apiFetch, username, onLogout }) {
       },
     ).finally(() => {
       setBusy(false)
-      setBatchCompleted(true)
     })
   }
 
@@ -300,13 +293,13 @@ export default function Containers({ apiFetch, username, onLogout }) {
     if (busy) return
     setExportingConsolidated(true)
     try {
-      const assets = lastBatchTargets.map((c) => {
+      const assets = readyToExport.map((c) => {
         const state = compat[c.name]
         return {
           name: c.name,
-          status: state?.assessmentStatus === 'success' ? 'success' : 'error',
-          findings: state?.findings ?? [],
-          error: state?.assessError ?? null,
+          status: 'success',
+          findings: state.findings,
+          error: null,
         }
       })
       const response = await apiFetch('/api/reports/pdf', {

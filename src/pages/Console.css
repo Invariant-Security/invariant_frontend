@@ -200,6 +200,11 @@ button {
   cursor: pointer;
 }
 
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* --- Console page (Endpoints) -- mesmo esqueleto .page/.site-header de
    Demo.jsx, classes repetidas de propósito (ver comentário no topo) --- */
 

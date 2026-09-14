@@ -10,7 +10,10 @@ import Containers from './Containers.jsx'
 // render() piles on top of the previous one in the same jsdom document,
 // and queries that expect a single match (getByRole/getByText) fail with
 // "found multiple elements" the moment more than one test has rendered.
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 function makeApiFetch({ containers = [{ name: 'tamois', image: 'tamois-img' }], checkResult = {}, findings = [] } = {}) {
   return vi.fn(async (path) => {
@@ -25,6 +28,9 @@ function makeApiFetch({ containers = [{ name: 'tamois', image: 'tamois-img' }], 
     }
     if (path.startsWith('/api/assess/')) {
       return { ok: true, json: async () => findings }
+    }
+    if (path === '/api/reports/pdf') {
+      return { ok: true, json: async () => ({}), blob: async () => new Blob() }
     }
     return { ok: true, json: async () => ({}) }
   })
@@ -92,18 +98,37 @@ describe('Containers -- botão de exportar consolidado', () => {
     expect(exportBtn.title).not.toBe('')
   })
 
-  it('continua desabilitado quando o lote executado teve só 1 container, mesmo já concluído', async () => {
+  it('continua desabilitado quando só 1 container foi avaliado com sucesso', async () => {
     await renderCheckedMultiple(['tamois'])
     fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByText(/Executar selecionados/))
 
     await waitFor(() => {
       const btn = screen.getByText('Exportar relatório consolidado')
-      if (!btn.title.includes('pelo menos dois')) throw new Error('lote ainda não terminou')
+      if (!btn.title.includes('pelo menos dois')) throw new Error('avaliação ainda não terminou')
     })
 
     const exportBtn = screen.getByText('Exportar relatório consolidado')
     expect(exportBtn.disabled).toBe(true)
+  })
+
+  it('habilita quando 2 containers avulsos (não em lote) foram avaliados e selecionados', async () => {
+    await renderCheckedMultiple(['tamois', 'babybet'])
+
+    fireEvent.click(screen.getByText('tamois').closest('.target-card').querySelector('.link-btn'))
+    await waitFor(() => screen.getByText('← Back'))
+    fireEvent.click(screen.getByText('← Back'))
+
+    fireEvent.click(screen.getByText('babybet').closest('.target-card').querySelector('.link-btn'))
+    await waitFor(() => screen.getByText('← Back'))
+    fireEvent.click(screen.getByText('← Back'))
+
+    const checkboxes = screen.getAllByRole('checkbox')
+    fireEvent.click(checkboxes[0])
+    fireEvent.click(checkboxes[1])
+
+    const exportBtn = screen.getByText('Exportar relatório consolidado')
+    expect(exportBtn.disabled).toBe(false)
   })
 
   it('habilita quando o lote executado teve 2 ou mais containers', async () => {
@@ -117,6 +142,53 @@ describe('Containers -- botão de exportar consolidado', () => {
       const btn = screen.getByText('Exportar relatório consolidado')
       expect(btn.disabled).toBe(false)
     })
+  })
+
+  it('desmarcar um container já avaliado desabilita de novo (seleção viva, não lote congelado)', async () => {
+    await renderCheckedMultiple(['tamois', 'babybet'])
+    const checkboxes = screen.getAllByRole('checkbox')
+    fireEvent.click(checkboxes[0])
+    fireEvent.click(checkboxes[1])
+    fireEvent.click(screen.getByText(/Executar selecionados/))
+
+    await waitFor(() => {
+      const btn = screen.getByText('Exportar relatório consolidado')
+      expect(btn.disabled).toBe(false)
+    })
+
+    fireEvent.click(checkboxes[0])
+
+    const exportBtn = screen.getByText('Exportar relatório consolidado')
+    expect(exportBtn.disabled).toBe(true)
+  })
+
+  it('exporta só os containers selecionados agora, não todos os já avaliados', async () => {
+    // jsdom não implementa URL.createObjectURL -- sem isso o download real
+    // (irrelevante pro que este teste verifica) lançaria e cairia no
+    // window.alert() de erro, também não implementado pelo jsdom.
+    vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:mock', revokeObjectURL: () => {} })
+
+    const apiFetch = await renderCheckedMultiple(['tamois', 'babybet', 'redis'])
+    const checkboxes = screen.getAllByRole('checkbox')
+    checkboxes.forEach((cb) => fireEvent.click(cb))
+    fireEvent.click(screen.getByText(/Executar selecionados/))
+    await waitFor(() => {
+      const btn = screen.getByText('Exportar relatório consolidado')
+      expect(btn.disabled).toBe(false)
+    })
+
+    // Desmarca "redis" -- só tamois e babybet devem ir no relatório.
+    fireEvent.click(checkboxes[2])
+
+    fireEvent.click(screen.getByText('Exportar relatório consolidado'))
+    await waitFor(() => {
+      const call = apiFetch.mock.calls.find(([path]) => path === '/api/reports/pdf')
+      if (!call) throw new Error('export ainda não chamou a API')
+    })
+
+    const call = apiFetch.mock.calls.find(([path]) => path === '/api/reports/pdf')
+    const body = JSON.parse(call[1].body)
+    expect(body.assets.map((a) => a.name).sort()).toEqual(['babybet', 'tamois'])
   })
 })
 
