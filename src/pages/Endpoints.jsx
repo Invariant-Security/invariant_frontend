@@ -1,8 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { parseEndpointsCsv } from '../csvImport.js'
+import { STATUS_LABEL, summarizeFailedProbe } from './discoveryEvidence.js'
 import { FindingsReport, FindingDetail } from '../findings.jsx'
 import { formatOsDisplayFromParts, formatTargetLabel } from '../targetLabel.js'
 import './Console.css'
 import './Findings.css'
+
+// Import de CSV: sem lib nova de propósito (a direção futura é evoluir
+// isso pra algo com IA, onde qualquer formato acaba virando texto antes de
+// ser interpretado -- não vale investir agora num parser binário de
+// XLS/XLSX pra descartar depois). Limites simples abaixo evitam um
+// arquivo gigante virando centenas de requests/inserts numa importação só
+// (e abuso acidental na demo) -- espelham MAX_BULK_ENDPOINTS do backend.
+const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024
+const MAX_IMPORT_ROWS = 500
 
 // Escopo desta tela: cadastrar endpoints (IP único ou CIDR), disparar a
 // identificação de rede (windows/linux/docker/waf/firewall/vmware, via
@@ -15,7 +26,7 @@ import './Findings.css'
 // como o docker-exec tem.
 
 function ClassificationBadge({ classification, confidence }) {
-  if (!classification) return <span className="badge badge--unknown">not scanned</span>
+  if (!classification) return <span className="badge badge--unknown">não escaneado</span>
   const pct = Math.round(confidence * 100)
   return (
     <span className={`badge badge--${classification}`}>
@@ -46,23 +57,53 @@ function EndpointCard({ endpoint, checkResult, discovering, onDiscover, onDelete
       )}
       <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
         <button type="button" className="link-btn" onClick={() => onDiscover(endpoint.id)} disabled={discovering}>
-          {discovering ? 'Scanning…' : 'Discover →'}
+          {discovering ? 'Escaneando…' : 'Descobrir →'}
         </button>
         {endpoint.classification && (
           <button type="button" className="link-btn" onClick={() => onViewResults(endpoint)}>
-            View evidence →
+            Ver evidências →
           </button>
         )}
         {endpoint.classification && (
           <button type="button" className="link-btn" onClick={() => onRunAssessment(endpoint)}>
-            Run assessment →
+            Executar avaliação →
           </button>
         )}
         <button type="button" className="link-btn" onClick={() => onDelete(endpoint.id)} style={{ color: 'var(--red)' }}>
-          Delete
+          Excluir
         </button>
       </div>
     </div>
+  )
+}
+
+function FailedProbeEvidence({ evidence }) {
+  const summary = summarizeFailedProbe(evidence)
+  if (!summary) return null
+  const { headline, total, openCount, counts, attempts } = summary
+  return (
+    <li className="evidence-chain__step">
+      <div className="evidence-chain__label">Por que não identificamos um serviço</div>
+      <p className="hint" style={{ margin: '0.25rem 0' }}>{headline}</p>
+      <p className="hint" style={{ margin: '0.25rem 0' }}>
+        {total} portas testadas · {openCount} abertas
+        {counts.timeout ? ` · ${counts.timeout} expiraram por tempo limite` : ''}
+        {counts.refused ? ` · ${counts.refused} recusaram conexão` : ''}
+        {counts.network_unreachable ? ` · ${counts.network_unreachable} sem rota` : ''}
+        {counts.host_unreachable ? ` · ${counts.host_unreachable} host inalcançável` : ''}
+        {counts.error ? ` · ${counts.error} erro na tentativa` : ''}
+      </p>
+      <details>
+        <summary className="hint" style={{ cursor: 'pointer' }}>Ver detalhes</summary>
+        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
+          {attempts.map((a) => (
+            <li key={a.port} className="mono">
+              Porta {a.port} — {STATUS_LABEL[a.status] ?? 'Erro na tentativa'}
+            </li>
+          ))}
+        </ul>
+      </details>
+    </li>
   )
 }
 
@@ -70,10 +111,10 @@ function ResultsDetail({ endpoint, results, onBack }) {
   return (
     <section>
       <button type="button" className="link-btn" onClick={onBack}>
-        ← Back
+        ← Voltar
       </button>
       <h2 className="mono">{endpoint.address}</h2>
-      {results.length === 0 && <p className="hint">No results yet -- run Discover first.</p>}
+      {results.length === 0 && <p className="hint">Nenhum resultado ainda -- rode Descobrir primeiro.</p>}
       {results.map((r) => (
         <div key={r.ip} style={{ marginBottom: '1.5rem' }}>
           <div className="mono" style={{ marginBottom: '0.5rem' }}>
@@ -81,17 +122,18 @@ function ResultsDetail({ endpoint, results, onBack }) {
           </div>
           <ol className="evidence-chain">
             <li className="evidence-chain__step">
-              <div className="evidence-chain__label">Open ports</div>
-              <div className="mono">{r.evidence.open_ports?.join(', ') || '(none responded)'}</div>
+              <div className="evidence-chain__label">Portas abertas</div>
+              <div className="mono">{r.evidence.open_ports?.join(', ') || '(nenhuma respondeu)'}</div>
             </li>
             {Object.entries(r.evidence.banners || {}).map(([port, banner]) => (
               <li key={port} className="evidence-chain__step">
-                <div className="evidence-chain__label">Signal on port {port}</div>
+                <div className="evidence-chain__label">Sinal na porta {port}</div>
                 <div className="mono">{banner}</div>
               </li>
             ))}
+            <FailedProbeEvidence evidence={r.evidence} />
             <li className="evidence-chain__step">
-              <div className="evidence-chain__label">Scanned at</div>
+              <div className="evidence-chain__label">Escaneado em</div>
               <div className="mono">{new Date(r.scanned_at).toLocaleString()}</div>
             </li>
           </ol>
@@ -128,18 +170,18 @@ function AssessForm({
   return (
     <section>
       <button type="button" className="link-btn" onClick={onBack}>
-        ← Back
+        ← Voltar
       </button>
-      <h2 className="mono">Run assessment — {endpoint.address}</h2>
-      <p className="hint">Credentials are used once for this request and never stored.</p>
+      <h2 className="mono">Executar avaliação — {endpoint.address}</h2>
+      <p className="hint">As credenciais são usadas uma vez nesta requisição e nunca armazenadas.</p>
       {checkResult && (
         <p className={`hint ${checkResult.testable ? '' : 'error'}`} style={{ marginBottom: '1rem' }}>
-          {checkResult.testable ? targetLabel : `Not testable: ${checkResult.reason ?? 'unknown reason'}`}
+          {checkResult.testable ? targetLabel : `Não testável: ${checkResult.reason ?? 'motivo desconhecido'}`}
         </p>
       )}
       <form className="endpoint-form" onSubmit={onSubmit}>
         <div className="field">
-          <label htmlFor="assess-port">Port</label>
+          <label htmlFor="assess-port">Porta</label>
           <input
             id="assess-port"
             type="number"
@@ -149,31 +191,31 @@ function AssessForm({
           />
         </div>
         <div className="field">
-          <label htmlFor="assess-username">Username</label>
+          <label htmlFor="assess-username">Usuário</label>
           <input id="assess-username" value={username} onChange={(e) => onUsernameChange(e.target.value)} required />
         </div>
         <div className="field">
-          <label>Auth method</label>
+          <label>Método de autenticação</label>
           <div className="toggle-group">
             <button
               type="button"
               className={`toggle-group__btn ${authMethod === 'key' ? 'toggle-group__btn--active' : ''}`}
               onClick={() => onAuthMethodChange('key')}
             >
-              SSH key
+              Chave SSH
             </button>
             <button
               type="button"
               className={`toggle-group__btn ${authMethod === 'password' ? 'toggle-group__btn--active' : ''}`}
               onClick={() => onAuthMethodChange('password')}
             >
-              Password
+              Senha
             </button>
           </div>
         </div>
         {authMethod === 'key' ? (
           <div className="field">
-            <label htmlFor="assess-key">Private key</label>
+            <label htmlFor="assess-key">Chave privada</label>
             <textarea
               id="assess-key"
               className="mono"
@@ -186,7 +228,7 @@ function AssessForm({
           </div>
         ) : (
           <div className="field">
-            <label htmlFor="assess-password">Password</label>
+            <label htmlFor="assess-password">Senha</label>
             <input
               id="assess-password"
               type="password"
@@ -204,7 +246,7 @@ function AssessForm({
             onClick={onCheck}
             disabled={assessing || checking}
           >
-            {checking ? 'Checking…' : 'Check'}
+            {checking ? 'Verificando…' : 'Verificar'}
           </button>
           <button
             type="submit"
@@ -212,11 +254,36 @@ function AssessForm({
             style={{ width: 'auto', padding: '0.55rem 1.2rem' }}
             disabled={assessing || checking}
           >
-            {assessing ? 'Running…' : 'Run assessment'}
+            {assessing ? 'Executando…' : 'Executar avaliação'}
           </button>
         </div>
       </form>
     </section>
+  )
+}
+
+function ImportSummary({ results, onDismiss }) {
+  const created = results.filter((r) => r.status === 'created')
+  const errors = results.filter((r) => r.status === 'error')
+  return (
+    <div className="hint" style={{ marginBottom: '1.5rem' }}>
+      <p style={{ marginBottom: errors.length > 0 ? '0.5rem' : 0 }}>
+        <strong>Importação concluída</strong>: {created.length} adicionados
+        {errors.length > 0 ? ` · ${errors.length} não adicionados` : ''}
+      </p>
+      {errors.length > 0 && (
+        <ul style={{ margin: '0 0 0.5rem', paddingLeft: '1.2rem' }}>
+          {errors.map((r) => (
+            <li key={r.row}>
+              Linha {r.row} ({r.address}): {r.detail}
+            </li>
+          ))}
+        </ul>
+      )}
+      <button type="button" className="link-btn" onClick={onDismiss}>
+        Fechar
+      </button>
+    </div>
   )
 }
 
@@ -227,6 +294,9 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
   const [newAddress, setNewAddress] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [discoveringId, setDiscoveringId] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const fileInputRef = useRef(null)
   // null = endpoint list. Otherwise a tagged union:
   //   {kind:'discovery', endpoint, results}
   //   {kind:'assess-form', endpoint}
@@ -275,6 +345,53 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
       await loadEndpoints()
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  function handleImportButtonClick() {
+    fileInputRef.current?.click()
+  }
+
+  async function handleImportFileSelected(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite selecionar o mesmo arquivo de novo depois
+    if (!file) return
+
+    setError(null)
+    setImportResult(null)
+
+    if (file.size > MAX_IMPORT_FILE_BYTES) {
+      setError('O arquivo contém mais endpoints do que o limite permitido.')
+      return
+    }
+
+    const text = await file.text()
+    const rows = parseEndpointsCsv(text)
+    if (rows.length > MAX_IMPORT_ROWS) {
+      setError('O arquivo contém mais endpoints do que o limite permitido.')
+      return
+    }
+    if (rows.length === 0) {
+      setError('Nenhum endereço válido encontrado no arquivo.')
+      return
+    }
+
+    setImporting(true)
+    try {
+      const response = await apiFetch('/api/endpoints/bulk', {
+        method: 'POST',
+        body: JSON.stringify(rows),
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.detail ?? `HTTP ${response.status}`)
+      }
+      setImportResult(await response.json())
+      await loadEndpoints()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -408,7 +525,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
           </a>
           <span>{username}</span>
           <button type="button" className="btn-secondary" onClick={onLogout}>
-            Log out
+            Sair
           </button>
         </div>
       </header>
@@ -421,35 +538,67 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
 
       {!detail && (
         <>
-          <h2>Add Linux host</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <h2 style={{ margin: 0 }}>Adicionar host Linux</h2>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                hidden
+                onChange={handleImportFileSelected}
+              />
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleImportButtonClick}
+                disabled={importing}
+              >
+                {importing ? 'Importando…' : 'Importar CSV'}
+              </button>
+            </div>
+          </div>
           <form className="endpoint-form" onSubmit={handleAddEndpoint}>
             <div className="field">
-              <label htmlFor="address">IP or CIDR range</label>
+              <label htmlFor="address">IP ou faixa CIDR</label>
               <input
                 id="address"
                 className="mono"
-                placeholder="10.0.0.5 or 10.0.0.0/24"
+                placeholder="10.0.0.5 ou 10.0.0.0/24"
                 value={newAddress}
                 onChange={(e) => setNewAddress(e.target.value)}
                 required
               />
             </div>
             <div className="field">
-              <label htmlFor="label">Label (optional)</label>
-              <input id="label" placeholder="office network" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+              <label htmlFor="label">Nome (opcional)</label>
+              <input id="label" placeholder="rede do escritório" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
             </div>
             <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '0.55rem 1.2rem' }}>
-              Add
+              Adicionar
             </button>
           </form>
 
-          <h2>Linux Hosts ({endpoints.length})</h2>
-          {!loaded && <p className="hint">Loading…</p>}
+          {importResult && <ImportSummary results={importResult} onDismiss={() => setImportResult(null)} />}
+
+          <h2>Hosts Linux ({endpoints.length})</h2>
+          {!loaded && <p className="hint">Carregando…</p>}
           {loaded && endpoints.length === 0 && (
-            <p className="hint">No hosts yet -- add one above, then click Discover to identify it.</p>
+            <p className="hint">Nenhum host ainda -- adicione um acima e clique em Descobrir pra identificá-lo.</p>
           )}
           <div className="card-grid">
-            {endpoints.map((endpoint) => (
+            {/* Hosts já identificados de verdade (classification real,
+                não "unknown"/vazio) sobem pro topo -- sort é estável, então
+                a ordem relativa dentro de cada grupo continua a mesma. Não
+                é um agrupamento visual novo, só uma ordenação -- refatorar
+                pra seções separadas fica pra outra rodada. */}
+            {[...endpoints]
+              .sort((a, b) => {
+                const aIdentified = a.classification && a.classification !== 'unknown' ? 0 : 1
+                const bIdentified = b.classification && b.classification !== 'unknown' ? 0 : 1
+                return aIdentified - bIdentified
+              })
+              .map((endpoint) => (
               <EndpointCard
                 key={endpoint.id}
                 endpoint={endpoint}
