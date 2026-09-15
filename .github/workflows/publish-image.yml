@@ -1,0 +1,34 @@
+# Net-new capacidade de CI, ver o mesmo comentário em invariant_api's
+# publish-image.yml -- publica a imagem que docker-compose.appliance.yml
+# referencia via `image:` (invariant-web). VITE_API_BASE="" (não unset) --
+# mesma convenção do Dockerfile: mantém os fetches same-origin, pro
+# nginx.appliance.conf proxear /api//auth//endpoints pro container api.
+name: publish-image
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            VITE_API_BASE=
+          tags: |
+            ghcr.io/invariant-security/invariant-web:${{ github.ref_name }}
+            ghcr.io/invariant-security/invariant-web:latest

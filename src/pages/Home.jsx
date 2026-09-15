@@ -264,7 +264,7 @@ export default function Home() {
           <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
           <button onClick={() => scrollTo('mercado')}>Mercado</button>
           <button onClick={() => scrollTo('planos')}>Planos</button>
-          <a href="/demo">Ver demo</a>
+          <a href="/containers">Ver demo</a>
         </nav>
 
         <button className="menu-toggle" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Abrir menu">
@@ -275,7 +275,7 @@ export default function Home() {
             <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
             <button onClick={() => scrollTo('mercado')}>Mercado</button>
             <button onClick={() => scrollTo('planos')}>Planos</button>
-            <a href="/demo">Ver demo</a>
+            <a href="/containers">Ver demo</a>
           </div>
         )}
       </header>
@@ -299,7 +299,7 @@ export default function Home() {
               <button className="primary-action" onClick={() => scrollTo('planos')}>
                 Ver planos <ArrowDownRight size={18} />
               </button>
-              <a className="secondary-action" href="/demo">
+              <a className="secondary-action" href="/containers">
                 Ver demo ao vivo <ExternalLink size={16} />
               </a>
             </div>
@@ -535,7 +535,7 @@ export default function Home() {
 
       <footer className="site-footer">
         <div className="footer-brand">Invariant</div>
-        <p>© 2026 Invariant Security. <a href="/demo">Ver demo</a></p>
+        <p>© 2026 Invariant Security. <a href="/containers">Ver demo</a></p>
         <a href="https://github.com/Invariant-Security/Invariant" target="_blank" rel="noreferrer">
           Repositório público <ExternalLink size={14} />
         </a>
