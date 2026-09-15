@@ -135,11 +135,34 @@ function UncheckedCard({ container }) {
   // gastar um assessment real contra um SO sem benchmark aplicável -- é
   // exatamente isso que o Check evita. Uma vez supported, o mesmo container
   // reaparece como CompatibleCard, que aí sim tem o botão via AssessAction.
+  // A instrução de "verifique a compatibilidade primeiro" mora só no
+  // FlowGuide, uma vez só -- repeti-la por card (como era antes) vira a
+  // mesma frase escrita dezenas de vezes na tela com uma lista grande.
   return (
     <div className="target-card">
       <div className="target-card__title mono">{container.name}</div>
-      <div className="hint" style={{ marginBottom: '0.75rem' }}>{container.image}</div>
-      <p className="hint">Clique em "Verificar compatibilidade" para avaliar este container.</p>
+      <div className="hint">{container.image}</div>
+    </div>
+  )
+}
+
+// Explica o fluxo uma única vez, no topo da página -- substitui a dica que
+// antes se repetia em cada UncheckedCard. Texto parafraseado de propósito
+// (nunca usa o texto exato de um rótulo de botão sozinho num nó): os testes
+// casam "Executar selecionados" por substring/regex, e qualquer nó de texto
+// que reproduza esse trecho literalmente quebraria esse getByText (exige 1
+// match só). "Verificar compatibilidade"/"Exportar relatório consolidado"
+// são casados por string exata, então já ficariam seguros mesmo citados,
+// mas a paráfrase evita ambiguidade de qualquer forma.
+function FlowGuide() {
+  return (
+    <div className="flow-guide">
+      <p className="flow-guide__title">Como funciona esta tela</p>
+      <ol className="flow-guide__steps">
+        <li>Verifique a compatibilidade dos containers para identificar o sistema operacional de cada um e quais têm checks CIS aplicáveis.</li>
+        <li>Rode a avaliação: em lote (marque vários containers compatíveis e execute de uma vez) ou individualmente, container por container.</li>
+        <li>Exporte os relatórios: PDF CEO ou Técnico por container avaliado, e o relatório Consolidado comparando dois ou mais containers já avaliados.</li>
+      </ol>
     </div>
   )
 }
@@ -381,6 +404,8 @@ export default function Containers({ apiFetch, username, onLogout }) {
               </button>
             </div>
           </div>
+
+          <FlowGuide />
 
           {!loaded && <p className="hint">Carregando…</p>}
           {loaded && containers.length === 0 && <p className="hint">Nenhum container encontrado neste host.</p>}

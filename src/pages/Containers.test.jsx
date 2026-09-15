@@ -88,6 +88,32 @@ describe('Containers -- card antes de "Verificar compatibilidade"', () => {
     // A checagem em si não deve ter sido disparada automaticamente.
     expect(apiFetch.mock.calls.some(([path]) => path.endsWith('/check'))).toBe(false)
   })
+
+  it('não repete a dica de compatibilidade por card', async () => {
+    const containers = ['tamois', 'babybet', 'redis'].map((name) => ({ name, image: `${name}-img` }))
+    const apiFetch = makeApiFetch({ containers })
+    render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (3)') }))
+    await waitFor(() => containers.forEach((c) => screen.getByText(c.name)))
+
+    // A dica de compatibilidade existe uma vez só, no FlowGuide -- nenhum
+    // card individual deve repeti-la.
+    expect(document.querySelectorAll('.target-card p').length).toBe(0)
+  })
+})
+
+describe('Containers -- mini-tutorial do fluxo', () => {
+  it('aparece uma única vez, antes e depois de verificar compatibilidade', async () => {
+    const containers = ['tamois', 'babybet', 'redis'].map((name) => ({ name, image: `${name}-img` }))
+    const apiFetch = makeApiFetch({ containers })
+    render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (3)') }))
+    expect(document.querySelectorAll('.flow-guide').length).toBe(1)
+
+    fireEvent.click(screen.getByText('Verificar compatibilidade'))
+    await waitFor(() => containers.forEach((c) => screen.getByText(c.name)))
+    expect(document.querySelectorAll('.flow-guide').length).toBe(1)
+  })
 })
 
 describe('Containers -- botão de exportar consolidado', () => {
