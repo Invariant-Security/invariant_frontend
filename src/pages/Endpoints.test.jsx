@@ -6,13 +6,16 @@ import Endpoints from './Endpoints.jsx'
 
 afterEach(cleanup)
 
-function makeApiFetch({ endpoints = [], bulkResult = [] } = {}) {
+function makeApiFetch({ endpoints = [], bulkResult = [], results = [] } = {}) {
   return vi.fn(async (path, options = {}) => {
     if (path === '/api/endpoints' && (!options.method || options.method === 'GET')) {
       return { ok: true, json: async () => endpoints }
     }
     if (path === '/api/endpoints/bulk') {
       return { ok: true, json: async () => bulkResult }
+    }
+    if (/\/api\/endpoints\/\d+\/results$/.test(path)) {
+      return { ok: true, json: async () => results }
     }
     return { ok: true, json: async () => ({}) }
   })
@@ -84,5 +87,87 @@ describe('Endpoints -- importar CSV', () => {
 
     await waitFor(() => screen.getByText('O arquivo contém mais endpoints do que o limite permitido.'))
     expect(apiFetch.mock.calls.some(([path]) => path === '/api/endpoints/bulk')).toBe(false)
+  })
+})
+
+describe('Endpoints -- evidência real de falha de discovery', () => {
+  it('mostra o resumo em português e nunca os códigos internos crus', async () => {
+    await renderEndpoints({
+      endpoints: [{ id: 9, address: '192.168.150.9', label: 'Auditorio', tags: [], classification: 'unknown', confidence: 0 }],
+      results: [
+        {
+          ip: '192.168.150.9',
+          classification: 'unknown',
+          confidence: 0,
+          scanned_at: '2026-09-15T12:00:00Z',
+          evidence: {
+            open_ports: [],
+            banners: {},
+            port_attempts: [
+              { port: 22, status: 'timeout' },
+              { port: 80, status: 'refused' },
+              { port: 443, status: 'network_unreachable' },
+            ],
+          },
+        },
+      ],
+    })
+
+    fireEvent.click(screen.getByText('Ver evidências →'))
+
+    await waitFor(() => screen.getByText(/portas testadas/))
+    screen.getByText('A rede de destino não possui rota alcançável a partir do ambiente de descoberta.')
+    screen.getByText(/3 portas testadas · 0 abertas/)
+
+    fireEvent.click(screen.getByText('Ver detalhes'))
+    screen.getByText(/Porta 22 — Tempo limite/)
+    screen.getByText(/Porta 80 — Conexão recusada/)
+    screen.getByText(/Porta 443 — Rede sem rota/)
+
+    // Nunca os códigos internos crus na tela.
+    expect(document.body.textContent).not.toMatch(/\btimeout\b/)
+    expect(document.body.textContent).not.toMatch(/\brefused\b/)
+    expect(document.body.textContent).not.toMatch(/\bnetwork_unreachable\b/)
+  })
+
+  it('não mostra o resumo de falha quando existe porta aberta', async () => {
+    await renderEndpoints({
+      endpoints: [{ id: 2, address: '10.153.120.185', label: 'Debian', tags: [], classification: 'linux', confidence: 1 }],
+      results: [
+        {
+          ip: '10.153.120.185',
+          classification: 'linux',
+          confidence: 1,
+          scanned_at: '2026-09-15T12:00:00Z',
+          evidence: { open_ports: [22], banners: { 22: 'SSH-2.0-OpenSSH_9.6' }, port_attempts: [{ port: 80, status: 'timeout' }] },
+        },
+      ],
+    })
+
+    fireEvent.click(screen.getByText('Ver evidências →'))
+
+    await waitFor(() => screen.getByText('22'))
+    expect(screen.queryByText('Ver detalhes')).toBeNull()
+    expect(screen.queryByText(/Por que não identificamos/)).toBeNull()
+  })
+
+  it('mantém compatibilidade com discovery antigo (sem port_attempts)', async () => {
+    await renderEndpoints({
+      endpoints: [{ id: 9, address: '192.168.150.9', label: 'Auditorio', tags: [], classification: 'unknown', confidence: 0 }],
+      results: [
+        {
+          ip: '192.168.150.9',
+          classification: 'unknown',
+          confidence: 0,
+          scanned_at: '2026-09-15T12:00:00Z',
+          evidence: { open_ports: [], banners: {} },
+        },
+      ],
+    })
+
+    fireEvent.click(screen.getByText('Ver evidências →'))
+
+    await waitFor(() => screen.getByText('(nenhuma respondeu)'))
+    expect(screen.queryByText('Ver detalhes')).toBeNull()
   })
 })

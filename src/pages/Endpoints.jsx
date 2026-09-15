@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { parseEndpointsCsv } from '../csvImport.js'
+import { STATUS_LABEL, summarizeFailedProbe } from './discoveryEvidence.js'
 import { FindingsReport, FindingDetail } from '../findings.jsx'
 import { formatOsDisplayFromParts, formatTargetLabel } from '../targetLabel.js'
 import './Console.css'
@@ -76,6 +77,36 @@ function EndpointCard({ endpoint, checkResult, discovering, onDiscover, onDelete
   )
 }
 
+function FailedProbeEvidence({ evidence }) {
+  const summary = summarizeFailedProbe(evidence)
+  if (!summary) return null
+  const { headline, total, openCount, counts, attempts } = summary
+  return (
+    <li className="evidence-chain__step">
+      <div className="evidence-chain__label">Por que não identificamos um serviço</div>
+      <p className="hint" style={{ margin: '0.25rem 0' }}>{headline}</p>
+      <p className="hint" style={{ margin: '0.25rem 0' }}>
+        {total} portas testadas · {openCount} abertas
+        {counts.timeout ? ` · ${counts.timeout} expiraram por tempo limite` : ''}
+        {counts.refused ? ` · ${counts.refused} recusaram conexão` : ''}
+        {counts.network_unreachable ? ` · ${counts.network_unreachable} sem rota` : ''}
+        {counts.host_unreachable ? ` · ${counts.host_unreachable} host inalcançável` : ''}
+        {counts.error ? ` · ${counts.error} erro na tentativa` : ''}
+      </p>
+      <details>
+        <summary className="hint" style={{ cursor: 'pointer' }}>Ver detalhes</summary>
+        <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.2rem' }}>
+          {attempts.map((a) => (
+            <li key={a.port} className="mono">
+              Porta {a.port} — {STATUS_LABEL[a.status] ?? 'Erro na tentativa'}
+            </li>
+          ))}
+        </ul>
+      </details>
+    </li>
+  )
+}
+
 function ResultsDetail({ endpoint, results, onBack }) {
   return (
     <section>
@@ -100,6 +131,7 @@ function ResultsDetail({ endpoint, results, onBack }) {
                 <div className="mono">{banner}</div>
               </li>
             ))}
+            <FailedProbeEvidence evidence={r.evidence} />
             <li className="evidence-chain__step">
               <div className="evidence-chain__label">Escaneado em</div>
               <div className="mono">{new Date(r.scanned_at).toLocaleString()}</div>
@@ -555,7 +587,18 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
             <p className="hint">Nenhum host ainda -- adicione um acima e clique em Descobrir pra identificá-lo.</p>
           )}
           <div className="card-grid">
-            {endpoints.map((endpoint) => (
+            {/* Hosts já identificados de verdade (classification real,
+                não "unknown"/vazio) sobem pro topo -- sort é estável, então
+                a ordem relativa dentro de cada grupo continua a mesma. Não
+                é um agrupamento visual novo, só uma ordenação -- refatorar
+                pra seções separadas fica pra outra rodada. */}
+            {[...endpoints]
+              .sort((a, b) => {
+                const aIdentified = a.classification && a.classification !== 'unknown' ? 0 : 1
+                const bIdentified = b.classification && b.classification !== 'unknown' ? 0 : 1
+                return aIdentified - bIdentified
+              })
+              .map((endpoint) => (
               <EndpointCard
                 key={endpoint.id}
                 endpoint={endpoint}
