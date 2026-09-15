@@ -367,7 +367,7 @@ export default function Containers({ apiFetch, username, onLogout }) {
         <div className="brand">INVARIANT</div>
         <div className="session-info">
           <a href="/endpoints" className="link-btn">
-            Linux Hosts
+            Hosts Linux
           </a>
           <span>{username}</span>
           <button type="button" className="btn-secondary" onClick={onLogout}>
