@@ -77,6 +77,19 @@ describe('Containers -- textos em português', () => {
   })
 })
 
+describe('Containers -- card antes de "Verificar compatibilidade"', () => {
+  it('não oferece "Executar avaliação" antes de checar compatibilidade', async () => {
+    const apiFetch = makeApiFetch()
+    render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (1)') }))
+    await waitFor(() => screen.getByText('tamois'))
+
+    expect(screen.queryByText('Executar avaliação →')).toBeNull()
+    // A checagem em si não deve ter sido disparada automaticamente.
+    expect(apiFetch.mock.calls.some(([path]) => path.endsWith('/check'))).toBe(false)
+  })
+})
+
 describe('Containers -- botão de exportar consolidado', () => {
   it('já aparece no primeiro render, antes de qualquer verificação', async () => {
     const apiFetch = makeApiFetch()

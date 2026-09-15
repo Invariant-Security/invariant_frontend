@@ -129,14 +129,17 @@ function CompatibleCard({ container, state, busy, onToggleSelected, onRun }) {
   )
 }
 
-function UncheckedCard({ container, busy, onRun }) {
+function UncheckedCard({ container }) {
+  // Nenhuma ação aqui de propósito: rodar uma avaliação individual antes de
+  // "Verificar compatibilidade" saberia o SO deste container arriscaria
+  // gastar um assessment real contra um SO sem benchmark aplicável -- é
+  // exatamente isso que o Check evita. Uma vez supported, o mesmo container
+  // reaparece como CompatibleCard, que aí sim tem o botão via AssessAction.
   return (
     <div className="target-card">
       <div className="target-card__title mono">{container.name}</div>
       <div className="hint" style={{ marginBottom: '0.75rem' }}>{container.image}</div>
-      <button type="button" className="link-btn" onClick={() => onRun(container)} disabled={busy}>
-        Executar avaliação →
-      </button>
+      <p className="hint">Clique em "Verificar compatibilidade" para avaliar este container.</p>
     </div>
   )
 }
@@ -385,7 +388,7 @@ export default function Containers({ apiFetch, username, onLogout }) {
           {!checked && (
             <div className="card-grid" style={{ marginTop: '1rem' }}>
               {containers.map((container) => (
-                <UncheckedCard key={container.name} container={container} busy={busy} onRun={handleCardAction} />
+                <UncheckedCard key={container.name} container={container} />
               ))}
             </div>
           )}
