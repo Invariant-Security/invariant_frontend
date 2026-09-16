@@ -32,6 +32,7 @@ function fillRequiredFields() {
   fireEvent.change(screen.getByLabelText(/E-mail corporativo\*/), { target: { value: 'ana@example.com' } })
   fireEvent.change(screen.getByLabelText(/Empresa\*/), { target: { value: 'Exemplo LTDA' } })
   fireEvent.change(screen.getByLabelText(/Interesse\*/), { target: { value: 'linux' } })
+  fireEvent.click(screen.getByLabelText(/Concordo com o uso dos meus dados/))
 }
 
 function makeFetch(impl) {
@@ -49,22 +50,38 @@ describe('Home -- formulário "Fale com a Invariant"', () => {
     screen.getByLabelText(/Empresa\*/)
     screen.getByLabelText('Cargo')
     screen.getByLabelText(/Interesse\*/)
-    screen.getByLabelText('Quantos ambientes Linux')
     screen.getByLabelText('Principal necessidade')
     screen.getByLabelText('Mensagem')
+    screen.getByLabelText(/Concordo com o uso dos meus dados/)
     screen.getByText('Falar com a Invariant')
     screen.getByText('Implantação on-premises · Licença anual · Atualizações e suporte incluídos.')
   })
 
-  it('marca nome/e-mail/empresa/interesse como obrigatórios', () => {
+  it('marca nome/e-mail/empresa/interesse/consentimento como obrigatórios', () => {
     render(<Home />)
 
     expect(screen.getByLabelText(/Nome\*/).required).toBe(true)
     expect(screen.getByLabelText(/E-mail corporativo\*/).required).toBe(true)
     expect(screen.getByLabelText(/Empresa\*/).required).toBe(true)
     expect(screen.getByLabelText(/Interesse\*/).required).toBe(true)
+    expect(screen.getByLabelText(/Concordo com o uso dos meus dados/).required).toBe(true)
     expect(screen.getByLabelText('Cargo').required).toBe(false)
     expect(screen.getByLabelText('Mensagem').required).toBe(false)
+  })
+
+  it('esconde "Quantos ambientes Linux" até o interesse incluir Linux', () => {
+    render(<Home />)
+
+    expect(screen.queryByLabelText('Quantos ambientes Linux')).toBeNull()
+
+    fireEvent.change(screen.getByLabelText(/Interesse\*/), { target: { value: 'containers' } })
+    expect(screen.queryByLabelText('Quantos ambientes Linux')).toBeNull()
+
+    fireEvent.change(screen.getByLabelText(/Interesse\*/), { target: { value: 'linux' } })
+    screen.getByLabelText('Quantos ambientes Linux')
+
+    fireEvent.change(screen.getByLabelText(/Interesse\*/), { target: { value: 'linux_containers' } })
+    screen.getByLabelText('Quantos ambientes Linux')
   })
 
   it('mostra o aviso de privacidade, sem link', () => {

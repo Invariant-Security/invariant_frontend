@@ -466,6 +466,44 @@
 }
 
 /* ---- lead form ---- */
+/* Duas colunas (mesmo padrão de .thesis-layout) -- o form ocupa uma
+   coluna, um card no estilo thesis-card-dark ocupa a outra, em vez de
+   deixar o form sozinho com max-width fixo (herança do grid antigo de
+   2 planos) flutuando com um vão vazio ao lado em telas largas. */
+.lead-layout {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+@media (min-width: 780px) {
+  .lead-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.lead-info-card p {
+  margin-bottom: 1.1rem;
+}
+.lead-info-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.lead-info-list li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.78);
+}
+.lead-info-list svg {
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
 .lead-form {
   background: var(--paper-raised);
   border: 1px solid var(--line);
@@ -473,7 +511,6 @@
   padding: 1.75rem;
   display: grid;
   gap: 1rem;
-  max-width: 32rem;
 }
 .lead-form label {
   display: grid;
@@ -481,7 +518,7 @@
   font-size: 0.85rem;
   color: var(--ink-soft);
 }
-.lead-form input,
+.lead-form input:not([type='checkbox']),
 .lead-form select,
 .lead-form textarea {
   border: 1px solid var(--line);
@@ -489,7 +526,18 @@
   padding: 0.55rem 0.7rem;
   font: inherit;
   color: var(--ink);
-  background: var(--paper);
+  /* Antes era var(--paper), igual ao fundo da própria página
+     (.research-shell) -- o único diferenciador do campo era a borda,
+     o que apagava visualmente o formulário bem na seção que hoje é a
+     principal chamada à ação do site. */
+  background: var(--paper-raised);
+}
+.lead-form input:not([type='checkbox']):focus,
+.lead-form select:focus,
+.lead-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .lead-form textarea {
   resize: vertical;
@@ -501,6 +549,21 @@
   margin: 0;
   font-size: 0.78rem;
   color: var(--ink-soft);
+}
+.lead-form .lead-consent {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.lead-consent input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
 }
 .lead-form-status {
   margin: 0;

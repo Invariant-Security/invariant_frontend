@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   ArrowDownRight,
   ArrowUpRight,
+  CheckCircle2,
   ChevronRight,
   CircleAlert,
   ExternalLink,
@@ -62,8 +63,14 @@ function LeadForm() {
   const [environmentSize, setEnvironmentSize] = useState('')
   const [primaryNeed, setPrimaryNeed] = useState('')
   const [message, setMessage] = useState('')
+  const [consent, setConsent] = useState(false)
   const [website, setWebsite] = useState('') // honeypot -- humano nunca preenche
   const [state, setState] = useState('idle') // idle | loading | success | error
+
+  // "Quantos ambientes Linux" só faz sentido se o interesse envolve Linux --
+  // some quando a pessoa escolhe só Containers, e o valor não é enviado
+  // nesse caso mesmo que já tivesse sido preenchido antes de trocar.
+  const showEnvironmentSize = targetScope === 'linux' || targetScope === 'linux_containers'
 
   async function submit(event) {
     event.preventDefault()
@@ -78,7 +85,7 @@ function LeadForm() {
           company,
           role: role || null,
           target_scope: targetScope,
-          environment_size: environmentSize || null,
+          environment_size: showEnvironmentSize ? environmentSize || null : null,
           primary_need: primaryNeed || null,
           message: message || null,
           website,
@@ -130,17 +137,19 @@ function LeadForm() {
           ))}
         </select>
       </label>
-      <label>
-        Quantos ambientes Linux
-        <select value={environmentSize} onChange={(event) => setEnvironmentSize(event.target.value)}>
-          <option value="">Selecione</option>
-          {ENVIRONMENT_SIZE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      {showEnvironmentSize && (
+        <label>
+          Quantos ambientes Linux
+          <select value={environmentSize} onChange={(event) => setEnvironmentSize(event.target.value)}>
+            <option value="">Selecione</option>
+            {ENVIRONMENT_SIZE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label>
         Principal necessidade
         <select value={primaryNeed} onChange={(event) => setPrimaryNeed(event.target.value)}>
@@ -169,6 +178,13 @@ function LeadForm() {
       />
 
       <p className="lead-form-privacy">Usaremos seus dados para responder ao seu contato comercial.</p>
+
+      <label className="lead-consent">
+        <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} required />
+        {/* Pendência: ainda não existe página de Política de Privacidade
+            publicada no site -- linkar aqui assim que ela existir. */}
+        <span>Concordo com o uso dos meus dados para este contato comercial.</span>
+      </label>
 
       <button type="submit" className="primary-action" disabled={state === 'loading'}>
         {state === 'loading' ? 'Enviando...' : 'Falar com a Invariant'}
@@ -456,7 +472,27 @@ export default function Home() {
             title="Leve o Invariant para o seu ambiente."
             body="Conte um pouco sobre a sua operação. Nós avaliamos o cenário e entramos em contato para mostrar como o Invariant pode ser aplicado ao seu ambiente."
           />
-          <LeadForm />
+          <div className="lead-layout">
+            <LeadForm />
+            <div className="thesis-card thesis-card-dark lead-info-card">
+              <div className="card-label">
+                <FileCheck2 size={16} /> DEPOIS DO ENVIO
+              </div>
+              <h3>Avaliamos seu cenário e voltamos com os próximos passos.</h3>
+              <p>Sem simulador de contrato por aqui -- o retorno é uma conversa sobre o seu ambiente e como o Invariant se aplica a ele.</p>
+              <ul className="lead-info-list">
+                <li>
+                  <CheckCircle2 size={16} /> CIS + Linux em demo pública de assessment
+                </li>
+                <li>
+                  <CheckCircle2 size={16} /> Rastreabilidade entre finding, controle, fonte e versão
+                </li>
+                <li>
+                  <CheckCircle2 size={16} /> Implantação on-premises, sem dado saindo do seu ambiente
+                </li>
+              </ul>
+            </div>
+          </div>
           <p className="deployment-note">Implantação on-premises · Licença anual · Atualizações e suporte incluídos.</p>
         </section>
       </main>
