@@ -29,13 +29,27 @@
   margin: 0;
 }
 
+/* Antes era só texto verde solto (uma linha fina de cor num mar de fundo
+   claro) -- agora é um chip com superfície própria, reaproveitando o
+   mesmo par de tokens já usado em .positioning-pill (verde-menta
+   derivado do accent + verde escuro no texto), só que menor. Dá peso de
+   "área colorida" ao verde em vez de deixá-lo só como traço de texto,
+   e funciona tanto sobre fundo claro quanto sobre fundo navy (mesmo
+   princípio de badge claro sobre superfície escura já usado em
+   .thesis-card-dark/.proof-strip). */
 .research-shell .eyebrow {
+  display: inline-flex;
+  align-items: center;
   font-family: 'DM Mono', monospace;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
-  margin: 0 0 0.4rem;
+  font-weight: 700;
+  color: #05684f;
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  margin: 0 0 0.5rem;
 }
 
 .research-shell .reveal {
@@ -402,10 +416,18 @@
 }
 
 /* ---- legacy ---- */
+/* Navy cheia, não papel/branco -- entre proof-strip e o rodapé havia
+   quase 2800px seguidos alternando só entre tons de fundo claro quase
+   idênticos (#f7f5ef/#ffffff), sem nenhuma pausa escura. Essa seção já
+   tinha o conteúdo mais denso do trecho (heading + parágrafo + lista de
+   3 pontos), então vira a segunda faixa navy da página -- mesmo tom de
+   .proof-strip/.site-footer, não uma variação nova. Sem border-top/
+   bottom em var(--line): esse tom (feito pra hairline sobre fundo
+   claro) ficaria destoante sobre navy -- a própria mudança de cor já
+   separa a seção das vizinhas, mesmo padrão de .proof-strip/.hero-section.
+*/
 .legacy-section {
-  background: var(--paper-raised);
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  background: var(--ink);
   padding: clamp(3rem, 7vw, 5rem) clamp(1.25rem, 4vw, 3rem);
 }
 .legacy-copy {
@@ -413,12 +435,13 @@
   margin: 0 auto;
 }
 .legacy-copy h2 {
+  color: #fff;
   font-size: clamp(1.4rem, 3vw, 1.9rem);
   margin: 0.5rem 0 1rem;
   text-wrap: balance;
 }
 .legacy-copy p {
-  color: var(--ink-soft);
+  color: rgba(255, 255, 255, 0.78);
 }
 .legacy-list {
   display: grid;
@@ -429,7 +452,7 @@
   display: flex;
   gap: 0.6rem;
   align-items: flex-start;
-  color: var(--ink);
+  color: #fff;
 }
 .legacy-list svg {
   color: var(--accent);
@@ -465,209 +488,130 @@
   font-size: 0.88rem;
 }
 
-/* ---- pricing ---- */
-.plans-grid {
+/* ---- lead form ---- */
+/* Duas colunas (mesmo padrão de .thesis-layout) -- o form ocupa uma
+   coluna, um card no estilo thesis-card-dark ocupa a outra, em vez de
+   deixar o form sozinho com max-width fixo (herança do grid antigo de
+   2 planos) flutuando com um vão vazio ao lado em telas largas. */
+.lead-layout {
   display: grid;
   gap: 1.25rem;
   grid-template-columns: 1fr;
-  margin-bottom: 2.5rem;
+  align-items: start;
 }
 @media (min-width: 780px) {
-  .plans-grid {
+  .lead-layout {
     grid-template-columns: 1fr 1fr;
   }
 }
-.plan-card {
-  background: var(--paper-raised);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 1.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
+.lead-info-card p {
+  margin-bottom: 1.1rem;
 }
-.plan-card-active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-.plan-blurb {
-  color: var(--ink-soft);
-  margin: 0;
-}
-.plan-features {
+.lead-info-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.55rem;
+  gap: 0.65rem;
 }
-.plan-features li {
+.lead-info-list li {
   display: flex;
   gap: 0.5rem;
   align-items: flex-start;
   font-size: 0.92rem;
-  color: var(--ink);
+  color: rgba(255, 255, 255, 0.78);
 }
-.plan-features svg {
+.lead-info-list svg {
   color: var(--accent);
   flex-shrink: 0;
   margin-top: 0.1rem;
 }
-.plan-price {
-  font-family: 'DM Mono', monospace;
-  font-weight: 500;
-  color: var(--ink);
-  margin: 0;
-}
-.plan-card .primary-action {
-  align-self: flex-start;
-}
 
-.scenario-panel {
-  background: var(--ink);
-  color: #fff;
+.lead-form {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
   border-radius: 18px;
   padding: 1.75rem;
   display: grid;
-  gap: 1.25rem;
+  gap: 1rem;
 }
-@media (min-width: 780px) {
-  .scenario-panel {
-    grid-template-columns: 1fr 1fr 1fr;
-    align-items: center;
-  }
-}
-.scenario-intro h3 {
-  color: #fff;
-  font-size: 1.1rem;
-  margin-top: 0.3rem;
-}
-.scenario-inputs {
+.lead-form label {
   display: grid;
-  gap: 0.75rem;
-}
-.scenario-inputs label {
-  display: grid;
-  gap: 0.3rem;
+  gap: 0.35rem;
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--ink-soft);
 }
-.scenario-inputs select,
-.scenario-inputs input {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+.lead-form input:not([type='checkbox']),
+.lead-form select,
+.lead-form textarea {
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.55rem 0.7rem;
-  color: #fff;
   font: inherit;
+  color: var(--ink);
+  /* Antes era var(--paper), igual ao fundo da própria página
+     (.research-shell) -- o único diferenciador do campo era a borda,
+     o que apagava visualmente o formulário bem na seção que hoje é a
+     principal chamada à ação do site. */
+  background: var(--paper-raised);
 }
-.scenario-result {
-  display: grid;
-  gap: 0.3rem;
+.lead-form input:not([type='checkbox']):focus,
+.lead-form select:focus,
+.lead-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
-.scenario-result span {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  color: var(--accent);
+.lead-form textarea {
+  resize: vertical;
 }
-.scenario-result strong {
-  font-family: 'DM Mono', monospace;
-  font-size: 1.6rem;
+.lead-form .primary-action {
+  justify-self: start;
 }
-.scenario-result small {
-  color: rgba(255, 255, 255, 0.7);
+.lead-form-privacy {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+.lead-form .lead-consent {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.lead-consent input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+.lead-form-status {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.lead-form-error {
+  color: #b3261e;
 }
 
-.source-note {
+.deployment-note {
   margin-top: 1.5rem;
   font-size: 0.8rem;
   color: var(--ink-soft);
 }
 
-/* ---- checkout panel ---- */
-.checkout-panel {
-  margin-top: 1.75rem;
-  background: var(--paper-raised);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 1.5rem;
-  max-width: 26rem;
-}
-.checkout-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-.checkout-head h4 {
-  font-family: 'Sora', sans-serif;
-  margin: 0;
-  font-size: 1.05rem;
-}
-.checkout-close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--ink-soft);
-}
-.checkout-form {
-  display: grid;
-  gap: 0.75rem;
-}
-.checkout-form label {
-  display: grid;
-  gap: 0.3rem;
-  font-size: 0.85rem;
-  color: var(--ink-soft);
-}
-.checkout-form input {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.55rem 0.7rem;
-  font: inherit;
-}
-.checkout-status {
-  color: var(--ink-soft);
-  font-size: 0.9rem;
-}
-.checkout-error {
-  display: grid;
-  gap: 0.75rem;
-}
-.checkout-paid {
-  display: flex;
-  gap: 0.6rem;
-  align-items: flex-start;
-  color: #05684f;
-}
-.checkout-qr {
-  display: grid;
-  gap: 0.6rem;
-  justify-items: center;
-  text-align: center;
-}
-.checkout-qr img {
-  width: 180px;
-  height: 180px;
-}
-.checkout-code {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.72rem;
-  word-break: break-all;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.6rem;
-}
-.checkout-hint {
-  font-size: 0.8rem;
-  color: var(--ink-soft);
-}
-
 /* ---- newsletter ---- */
+/* Era var(--paper-raised) (#ffffff) -- próxima demais do #f7f5ef da
+   seção de leads logo acima pra funcionar como alternância visual (o
+   mesmo problema que .legacy-section tinha antes de virar navy).
+   Unificado pro mesmo tom claro do resto do site; a borda superior que
+   já existia aqui vira o separador de propósito, em vez de depender de
+   uma diferença de cor grande demais pra ser percebida. */
 .newsletter-section {
-  background: var(--paper-raised);
+  background: var(--paper);
   border-top: 1px solid var(--line);
   padding: 2.5rem clamp(1.25rem, 4vw, 3rem);
   max-width: 76rem;
