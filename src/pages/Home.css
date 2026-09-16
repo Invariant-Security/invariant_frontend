@@ -29,13 +29,27 @@
   margin: 0;
 }
 
+/* Antes era só texto verde solto (uma linha fina de cor num mar de fundo
+   claro) -- agora é um chip com superfície própria, reaproveitando o
+   mesmo par de tokens já usado em .positioning-pill (verde-menta
+   derivado do accent + verde escuro no texto), só que menor. Dá peso de
+   "área colorida" ao verde em vez de deixá-lo só como traço de texto,
+   e funciona tanto sobre fundo claro quanto sobre fundo navy (mesmo
+   princípio de badge claro sobre superfície escura já usado em
+   .thesis-card-dark/.proof-strip). */
 .research-shell .eyebrow {
+  display: inline-flex;
+  align-items: center;
   font-family: 'DM Mono', monospace;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--accent);
-  margin: 0 0 0.4rem;
+  font-weight: 700;
+  color: #05684f;
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  margin: 0 0 0.5rem;
 }
 
 .research-shell .reveal {
@@ -402,10 +416,18 @@
 }
 
 /* ---- legacy ---- */
+/* Navy cheia, não papel/branco -- entre proof-strip e o rodapé havia
+   quase 2800px seguidos alternando só entre tons de fundo claro quase
+   idênticos (#f7f5ef/#ffffff), sem nenhuma pausa escura. Essa seção já
+   tinha o conteúdo mais denso do trecho (heading + parágrafo + lista de
+   3 pontos), então vira a segunda faixa navy da página -- mesmo tom de
+   .proof-strip/.site-footer, não uma variação nova. Sem border-top/
+   bottom em var(--line): esse tom (feito pra hairline sobre fundo
+   claro) ficaria destoante sobre navy -- a própria mudança de cor já
+   separa a seção das vizinhas, mesmo padrão de .proof-strip/.hero-section.
+*/
 .legacy-section {
-  background: var(--paper-raised);
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  background: var(--ink);
   padding: clamp(3rem, 7vw, 5rem) clamp(1.25rem, 4vw, 3rem);
 }
 .legacy-copy {
@@ -413,12 +435,13 @@
   margin: 0 auto;
 }
 .legacy-copy h2 {
+  color: #fff;
   font-size: clamp(1.4rem, 3vw, 1.9rem);
   margin: 0.5rem 0 1rem;
   text-wrap: balance;
 }
 .legacy-copy p {
-  color: var(--ink-soft);
+  color: rgba(255, 255, 255, 0.78);
 }
 .legacy-list {
   display: grid;
@@ -429,7 +452,7 @@
   display: flex;
   gap: 0.6rem;
   align-items: flex-start;
-  color: var(--ink);
+  color: #fff;
 }
 .legacy-list svg {
   color: var(--accent);
@@ -581,8 +604,14 @@
 }
 
 /* ---- newsletter ---- */
+/* Era var(--paper-raised) (#ffffff) -- próxima demais do #f7f5ef da
+   seção de leads logo acima pra funcionar como alternância visual (o
+   mesmo problema que .legacy-section tinha antes de virar navy).
+   Unificado pro mesmo tom claro do resto do site; a borda superior que
+   já existia aqui vira o separador de propósito, em vez de depender de
+   uma diferença de cor grande demais pra ser percebida. */
 .newsletter-section {
-  background: var(--paper-raised);
+  background: var(--paper);
   border-top: 1px solid var(--line);
   padding: 2.5rem clamp(1.25rem, 4vw, 3rem);
   max-width: 76rem;
