@@ -534,6 +534,20 @@
   padding: 1.75rem;
   display: grid;
   gap: 1rem;
+  transition: opacity 200ms ease;
+}
+/* Fade sequencial no envio: o form desaparece primeiro (esta transição),
+   só depois disso o JS troca pelo .lead-success (ver useEffect em
+   LeadForm) -- não é um crossfade simultâneo, é uma saída seguida de
+   entrada, como pedido. */
+.lead-form.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lead-form {
+    transition: none;
+  }
 }
 .lead-form label {
   display: grid;
@@ -595,6 +609,42 @@
 }
 .lead-form-error {
   color: #b3261e;
+}
+
+/* Estado de sucesso -- mesmo peso visual do card à direita
+   (.lead-info-card), em vez de um <p> solto que deixava a coluna
+   esquerda com um vão vazio grande embaixo (a coluna do grid mantinha a
+   altura do form cheio, mas só sobrava 2 linhas de texto dentro dela).
+   Entra com uma animação própria (não uma transition ligada a mudança
+   de propriedade) porque é conteúdo novo sendo montado, não um elemento
+   já presente mudando de estado -- ver LeadForm's fade sequencial: o
+   .lead-form já terminou de sumir antes deste elemento sequer existir. */
+@keyframes lead-success-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.lead-success {
+  animation: lead-success-in 280ms ease forwards;
+}
+.lead-success p {
+  margin-bottom: 1.1rem;
+}
+.lead-success-hint {
+  color: rgba(255, 255, 255, 0.78);
+}
+.lead-success .secondary-action {
+  margin-top: 0.25rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lead-success {
+    animation: none;
+  }
 }
 
 .deployment-note {

@@ -115,11 +115,14 @@ describe('Home -- formulário "Fale com a Invariant"', () => {
 
     fireEvent.click(screen.getByText('Falar com a Invariant'))
 
-    await waitFor(() =>
-      screen.getByText(
-        'Recebemos seus dados. Nosso time entrará em contato para entender seu ambiente e apresentar o Invariant.',
-      ),
-    )
+    // O form some (fade-out, ~200ms) antes da confirmação ser montada --
+    // ver LeadForm's useEffect/isLeaving em Home.jsx -- por isso o
+    // waitFor aqui cobre esse atraso real, não é só uma troca instantânea.
+    await waitFor(() => screen.getByText('Recebemos seus dados.'))
+    screen.getByText('Nosso time entrará em contato para entender seu ambiente e apresentar o Invariant.')
+    // "Ver demo ao vivo" já existe no hero -- o card de sucesso soma uma
+    // segunda ocorrência, não substitui a primeira.
+    expect(screen.getAllByText('Ver demo ao vivo', { exact: false })).toHaveLength(2)
     expect(screen.queryByLabelText(/Nome\*/)).toBeNull()
   })
 

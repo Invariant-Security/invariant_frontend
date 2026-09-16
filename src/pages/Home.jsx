@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -66,6 +66,10 @@ function LeadForm() {
   const [consent, setConsent] = useState(false)
   const [website, setWebsite] = useState('') // honeypot -- humano nunca preenche
   const [state, setState] = useState('idle') // idle | loading | success | error
+  // Fade sequencial pedido: o form desaparece (200ms) ANTES da confirmação
+  // ser montada, não um crossfade simultâneo -- ver .lead-form.is-leaving /
+  // .lead-success em Home.css. Só efeito visual, não muda o fluxo de envio.
+  const [isLeaving, setIsLeaving] = useState(false)
 
   // "Quantos ambientes Linux" só faz sentido se o interesse envolve Linux --
   // some quando a pessoa escolhe só Containers, e o valor não é enviado
@@ -92,22 +96,37 @@ function LeadForm() {
         }),
       })
       if (!response.ok) throw new Error()
-      setState('success')
+      setIsLeaving(true) // dispara o fade-out do form; o estado 'success' só entra depois dele terminar
     } catch {
       setState('error')
     }
   }
 
+  useEffect(() => {
+    if (!isLeaving) return
+    // 200ms == duração do fade-out de .lead-form.is-leaving em Home.css
+    const timeout = setTimeout(() => setState('success'), 200)
+    return () => clearTimeout(timeout)
+  }, [isLeaving])
+
   if (state === 'success') {
     return (
-      <p className="lead-form-status">
-        Recebemos seus dados. Nosso time entrará em contato para entender seu ambiente e apresentar o Invariant.
-      </p>
+      <div className="thesis-card thesis-card-dark lead-success">
+        <div className="card-label">
+          <CheckCircle2 size={16} /> ENVIADO
+        </div>
+        <h3>Recebemos seus dados.</h3>
+        <p>Nosso time entrará em contato para entender seu ambiente e apresentar o Invariant.</p>
+        <p className="lead-success-hint">Enquanto isso, você pode ver a demo ao vivo:</p>
+        <a className="secondary-action" href="/containers">
+          Ver demo ao vivo <ExternalLink size={16} />
+        </a>
+      </div>
     )
   }
 
   return (
-    <form onSubmit={submit} className="lead-form">
+    <form onSubmit={submit} className={`lead-form${isLeaving ? ' is-leaving' : ''}`}>
       <label>
         Nome*
         <input value={name} onChange={(event) => setName(event.target.value)} required />
