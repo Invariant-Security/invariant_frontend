@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   ArrowDownRight,
   ArrowUpRight,
-  CheckCircle2,
   ChevronRight,
   CircleAlert,
   ExternalLink,
@@ -19,47 +18,6 @@ import './Home.css'
 // Overridable via VITE_API_BASE, same convention as Demo.jsx.
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
 
-// Preço calculado aqui só pra exibir uma prévia -- quem decide o valor de
-// verdade é o servidor (POST /billing/checkout), igual ao BabyBet nunca
-// confia no valor que vem do navegador.
-function computeAnnualPrice(plan, activations) {
-  if (plan === 'single') return Math.max(0, activations) * 12000
-  if (activations <= 0) return 0
-  if (activations <= 3) return 30000
-  return 30000 + (activations - 3) * 8000
-}
-
-const PLAN_COPY = {
-  single: {
-    title: 'Single Activation',
-    blurb: 'Uma ativação para um ambiente operacional delimitado.',
-    features: [
-      'Execução on-premises no seu ambiente',
-      'Um pacote de baselines contratado',
-      'Atualizações de conteúdo e software por 12 meses',
-      'Relatório de evidência por ativação',
-      'Suporte padrão em horário comercial',
-    ],
-    priceLabel: 'R$ 12.000 / ativação / ano',
-  },
-  multi: {
-    title: 'Multi Activation',
-    blurb: 'Para filiais, datacenters, ambientes separados ou clientes distintos.',
-    features: [
-      'Tudo do Single Activation',
-      '3 ativações incluídas no plano',
-      'R$ 8.000 por ativação adicional',
-      'Relatórios consolidados entre ativações',
-      'Suporte prioritário',
-    ],
-    priceLabel: 'R$ 30.000 / 3 ativações / ano',
-  },
-}
-
-function SourceNote({ children }) {
-  return <p className="source-note">{children}</p>
-}
-
 function SectionHeader({ index, eyebrow, title, body }) {
   const ref = useScrollReveal()
   return (
@@ -74,107 +32,153 @@ function SectionHeader({ index, eyebrow, title, body }) {
   )
 }
 
-function CheckoutPanel({ plan, activations, onClose }) {
-  const [contactName, setContactName] = useState('')
-  const [contactEmail, setContactEmail] = useState('')
-  const [state, setState] = useState('form') // form | loading | ready | error | paid
-  const [checkout, setCheckout] = useState(null)
-  const [errorMessage, setErrorMessage] = useState('')
+const TARGET_SCOPE_OPTIONS = [
+  { value: 'linux', label: 'Linux' },
+  { value: 'containers', label: 'Containers' },
+  { value: 'linux_containers', label: 'Linux + Containers' },
+]
+const ENVIRONMENT_SIZE_OPTIONS = [
+  { value: '1_10', label: '1–10' },
+  { value: '11_50', label: '11–50' },
+  { value: '51_100', label: '51–100' },
+  { value: '100_plus', label: 'Mais de 100' },
+  { value: 'evaluating', label: 'Ainda estou avaliando' },
+]
+const PRIMARY_NEED_OPTIONS = [
+  { value: 'compliance_cis', label: 'Conformidade / CIS' },
+  { value: 'audit', label: 'Auditoria' },
+  { value: 'evidence', label: 'Evidências' },
+  { value: 'hardening', label: 'Hardening' },
+  { value: 'devsecops', label: 'DevSecOps' },
+  { value: 'other', label: 'Outro' },
+]
+
+function LeadForm() {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [company, setCompany] = useState('')
+  const [role, setRole] = useState('')
+  const [targetScope, setTargetScope] = useState('')
+  const [environmentSize, setEnvironmentSize] = useState('')
+  const [primaryNeed, setPrimaryNeed] = useState('')
+  const [message, setMessage] = useState('')
+  const [website, setWebsite] = useState('') // honeypot -- humano nunca preenche
+  const [state, setState] = useState('idle') // idle | loading | success | error
 
   async function submit(event) {
     event.preventDefault()
     setState('loading')
-    setErrorMessage('')
     try {
-      const response = await fetch(`${API_BASE}/billing/checkout`, {
+      const response = await fetch(`${API_BASE}/leads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, activations, contact_name: contactName, contact_email: contactEmail }),
+        body: JSON.stringify({
+          name,
+          email,
+          company,
+          role: role || null,
+          target_scope: targetScope,
+          environment_size: environmentSize || null,
+          primary_need: primaryNeed || null,
+          message: message || null,
+          website,
+        }),
       })
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({}))
-        throw new Error(detail.detail || `Erro ${response.status}`)
-      }
-      const data = await response.json()
-      setCheckout(data)
-      setState('ready')
-      pollStatus(data.id)
-    } catch (error) {
-      setErrorMessage(error.message || 'Não foi possível iniciar o pagamento.')
+      if (!response.ok) throw new Error()
+      setState('success')
+    } catch {
       setState('error')
     }
   }
 
-  function pollStatus(id) {
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch(`${API_BASE}/billing/status/${id}`)
-        if (!response.ok) return
-        const data = await response.json()
-        if (data.status === 'paid') {
-          setState('paid')
-          clearInterval(interval)
-        }
-      } catch {
-        // rede instável durante o polling -- tenta de novo no próximo tick
-      }
-    }, 4000)
-    setTimeout(() => clearInterval(interval), 15 * 60 * 1000)
+  if (state === 'success') {
+    return (
+      <p className="lead-form-status">
+        Recebemos seus dados. Nosso time entrará em contato para entender seu ambiente e apresentar o Invariant.
+      </p>
+    )
   }
 
   return (
-    <div className="checkout-panel">
-      <div className="checkout-head">
-        <h4>Contratar {PLAN_COPY[plan].title}</h4>
-        <button type="button" className="checkout-close" onClick={onClose} aria-label="Fechar">
-          <X size={18} />
-        </button>
-      </div>
+    <form onSubmit={submit} className="lead-form">
+      <label>
+        Nome*
+        <input value={name} onChange={(event) => setName(event.target.value)} required />
+      </label>
+      <label>
+        E-mail corporativo*
+        <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+      </label>
+      <label>
+        Empresa*
+        <input value={company} onChange={(event) => setCompany(event.target.value)} required />
+      </label>
+      <label>
+        Cargo
+        <input value={role} onChange={(event) => setRole(event.target.value)} />
+      </label>
+      <label>
+        Interesse*
+        <select value={targetScope} onChange={(event) => setTargetScope(event.target.value)} required>
+          <option value="" disabled>
+            Selecione
+          </option>
+          {TARGET_SCOPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Quantos ambientes Linux
+        <select value={environmentSize} onChange={(event) => setEnvironmentSize(event.target.value)}>
+          <option value="">Selecione</option>
+          {ENVIRONMENT_SIZE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Principal necessidade
+        <select value={primaryNeed} onChange={(event) => setPrimaryNeed(event.target.value)}>
+          <option value="">Selecione</option>
+          {PRIMARY_NEED_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Mensagem
+        <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={4} />
+      </label>
 
-      {state === 'form' && (
-        <form onSubmit={submit} className="checkout-form">
-          <label>
-            Nome
-            <input value={contactName} onChange={(event) => setContactName(event.target.value)} required />
-          </label>
-          <label>
-            E-mail
-            <input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} required />
-          </label>
-          <button type="submit" className="primary-action">
-            Gerar cobrança Pix
-          </button>
-        </form>
-      )}
+      {/* Honeypot -- escondido da tela, humano nunca preenche */}
+      <input
+        type="text"
+        value={website}
+        onChange={(event) => setWebsite(event.target.value)}
+        style={{ position: 'absolute', left: '-9999px', opacity: 0 }}
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+      />
 
-      {state === 'loading' && <p className="checkout-status">Gerando cobrança...</p>}
+      <p className="lead-form-privacy">Usaremos seus dados para responder ao seu contato comercial.</p>
 
+      <button type="submit" className="primary-action" disabled={state === 'loading'}>
+        {state === 'loading' ? 'Enviando...' : 'Falar com a Invariant'}
+      </button>
       {state === 'error' && (
-        <div className="checkout-status checkout-error">
-          <p>{errorMessage}</p>
-          <button type="button" className="secondary-action" onClick={() => setState('form')}>
-            Tentar de novo
-          </button>
-        </div>
+        <p className="lead-form-status lead-form-error">
+          Não foi possível enviar seus dados. Tente novamente em alguns instantes.
+        </p>
       )}
-
-      {state === 'ready' && checkout && (
-        <div className="checkout-qr">
-          {checkout.qr_code_base64 && (
-            <img src={`data:image/png;base64,${checkout.qr_code_base64}`} alt="QR code Pix" />
-          )}
-          <p className="checkout-code">{checkout.qr_code}</p>
-          <p className="checkout-hint">Escaneie ou copie o código Pix. Confirmamos automaticamente após o pagamento.</p>
-        </div>
-      )}
-
-      {state === 'paid' && (
-        <div className="checkout-status checkout-paid">
-          <CheckCircle2 size={22} />
-          <p>Pagamento confirmado. Entraremos em contato para dar sequência à ativação.</p>
-        </div>
-      )}
-    </div>
+    </form>
   )
 }
 
@@ -229,12 +233,6 @@ function NewsletterForm() {
 export default function Home() {
   useDocumentLang('pt-BR')
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [activations, setActivations] = useState(1)
-  const [plan, setPlan] = useState('single')
-  const [checkoutPlan, setCheckoutPlan] = useState(null)
-
-  const annualPotential = useMemo(() => computeAnnualPrice(plan, activations), [plan, activations])
-  const planLabel = PLAN_COPY[plan].title
 
   const scrollTo = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -263,7 +261,7 @@ export default function Home() {
         <nav className="desktop-nav" aria-label="Navegação principal">
           <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
           <button onClick={() => scrollTo('mercado')}>Mercado</button>
-          <button onClick={() => scrollTo('planos')}>Planos</button>
+          <button onClick={() => scrollTo('planos')}>Falar com a gente</button>
           <a href="/containers">Ver demo</a>
         </nav>
 
@@ -274,7 +272,7 @@ export default function Home() {
           <div className="mobile-nav">
             <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
             <button onClick={() => scrollTo('mercado')}>Mercado</button>
-            <button onClick={() => scrollTo('planos')}>Planos</button>
+            <button onClick={() => scrollTo('planos')}>Falar com a gente</button>
             <a href="/containers">Ver demo</a>
           </div>
         )}
@@ -297,7 +295,7 @@ export default function Home() {
             </p>
             <div className="hero-actions">
               <button className="primary-action" onClick={() => scrollTo('planos')}>
-                Ver planos <ArrowDownRight size={18} />
+                Falar com a gente <ArrowDownRight size={18} />
               </button>
               <a className="secondary-action" href="/containers">
                 Ver demo ao vivo <ExternalLink size={16} />
@@ -454,80 +452,12 @@ export default function Home() {
         <section id="planos" className="content-section pricing-section">
           <SectionHeader
             index="03"
-            eyebrow="Planos"
-            title="Ativação on-premises: você roda no seu ambiente, a gente cuida da evidência."
-            body="Sem custo de infraestrutura hospedada — você paga pelo direito de uso, atualizações e suporte da ativação, não por finding ou por hora de nuvem."
+            eyebrow="Fale com a Invariant"
+            title="Leve o Invariant para o seu ambiente."
+            body="Conte um pouco sobre a sua operação. Nós avaliamos o cenário e entramos em contato para mostrar como o Invariant pode ser aplicado ao seu ambiente."
           />
-          <div className="plans-grid">
-            {(['single', 'multi']).map((key) => {
-              const info = PLAN_COPY[key]
-              return (
-                <article key={key} className={`plan-card ${plan === key ? 'plan-card-active' : ''}`}>
-                  <h3>{info.title}</h3>
-                  <p className="plan-blurb">{info.blurb}</p>
-                  <ul className="plan-features">
-                    {info.features.map((feature) => (
-                      <li key={feature}>
-                        <CheckCircle2 size={16} /> {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="plan-price">{info.priceLabel}</p>
-                  <button
-                    type="button"
-                    className="primary-action"
-                    onClick={() => {
-                      setPlan(key)
-                      setCheckoutPlan(key)
-                    }}
-                  >
-                    Contratar {info.title}
-                  </button>
-                </article>
-              )
-            })}
-          </div>
-
-          <div className="scenario-panel">
-            <div className="scenario-intro">
-              <p className="eyebrow">SIMULE SEU CONTRATO</p>
-              <h3>Quantas ativações você precisa?</h3>
-            </div>
-            <div className="scenario-inputs">
-              <label>
-                Plano
-                <select value={plan} onChange={(event) => setPlan(event.target.value)}>
-                  <option value="single">Single Activation</option>
-                  <option value="multi">Multi Activation</option>
-                </select>
-              </label>
-              <label>
-                Quantidade de ativações
-                <input
-                  type="number"
-                  min="0"
-                  value={activations || ''}
-                  placeholder="Ex.: 3"
-                  onChange={(event) => setActivations(Math.max(0, Number(event.target.value)))}
-                />
-              </label>
-            </div>
-            <div className="scenario-result">
-              <span>ESTIMATIVA DE CONTRATO ANUAL</span>
-              <strong>
-                {annualPotential > 0
-                  ? annualPotential.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
-                  : 'Preencha as premissas'}
-              </strong>
-              <small>{annualPotential > 0 ? `${planLabel} · ${activations} ativaç${activations === 1 ? 'ão' : 'ões'}` : ''}</small>
-            </div>
-          </div>
-
-          {checkoutPlan && (
-            <CheckoutPanel plan={checkoutPlan} activations={activations} onClose={() => setCheckoutPlan(null)} />
-          )}
-
-          <SourceNote>Valores são hipóteses de preço em teste, antes de impostos, sujeitas a ajuste por contrato.</SourceNote>
+          <LeadForm />
+          <p className="deployment-note">Implantação on-premises · Licença anual · Atualizações e suporte incluídos.</p>
         </section>
       </main>
 
