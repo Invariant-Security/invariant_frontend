@@ -5,6 +5,12 @@ import { formatOsDisplayFromParts, formatTargetLabel } from '../targetLabel.js'
 import './Console.css'
 import './Findings.css'
 
+// Overridable via VITE_API_BASE, same convention as Home.jsx/Demo.jsx --
+// VisitorContainers usa isso pra montar link direto pro GET público
+// /demo-snapshot/report (fora do apiFetch normal, porque é um link de
+// navegador que abre o PDF, não uma chamada fetch).
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
+
 // Escopo desta tela: listar containers Docker deste host (GET /containers,
 // já filtra fora o próprio stack do invariant), descobrir de antemão quais
 // têm SO compatível (GET /containers/{name}/check -- leve, não roda os 199
@@ -176,7 +182,19 @@ function InfoCard({ container, reason }) {
   )
 }
 
-export default function Containers({ apiFetch, username, onLogout }) {
+// /containers é o ponto de entrada da demo pública (Home.jsx's "Explorar
+// demo") -- sem sessão, App.jsx renderiza <VisitorContainers> em vez
+// deste componente (ver seu próprio comentário mais abaixo). Isso aqui
+// é só o console autenticado: containers reais, checagem, assessment,
+// relatórios ao vivo, e o painel de publicação da demo.
+export default function Containers({ apiFetch, username, onLogout, isVisitor = false, onRequestLogin }) {
+  if (isVisitor) {
+    return <VisitorContainers apiFetch={apiFetch} onRequestLogin={onRequestLogin} />
+  }
+  return <AdminContainers apiFetch={apiFetch} username={username} onLogout={onLogout} />
+}
+
+function AdminContainers({ apiFetch, username, onLogout }) {
   const [containers, setContainers] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(null)
@@ -187,6 +205,11 @@ export default function Containers({ apiFetch, username, onLogout }) {
   //   {kind:'assess-result', container, findings}
   //   {kind:'finding-detail', container, findings, finding}
   const [detail, setDetail] = useState(null)
+  // idle | previewing | preview-ready | publishing | published | error
+  const [publishState, setPublishState] = useState('idle')
+  const [publishPreview, setPublishPreview] = useState(null)
+  const [publishError, setPublishError] = useState(null)
+  const [revokeMessage, setRevokeMessage] = useState(null)
 
   useEffect(() => {
     apiFetch('/api/containers')
@@ -347,6 +370,81 @@ export default function Containers({ apiFetch, username, onLogout }) {
     }
   }
 
+  // Tudo que já foi avaliado com sucesso entra na demo -- não é filtrado
+  // pela seleção viva (checkbox), que é um conceito só do "Executar
+  // selecionados"/consolidado ao vivo. Publicar a demo é uma ação
+  // separada, sobre tudo que existe de resultado no momento.
+  const assessedContainers = containers.filter((c) => compat[c.name]?.assessmentStatus === 'success')
+
+  function buildDemoPayload() {
+    return {
+      containers: assessedContainers.map((c) => ({
+        container_id: c.id,
+        findings: compat[c.name].findings,
+      })),
+    }
+  }
+
+  async function handlePreviewDemo() {
+    if (busy || assessedContainers.length === 0) return
+    setPublishState('previewing')
+    setPublishError(null)
+    setRevokeMessage(null)
+    try {
+      const response = await apiFetch('/demo-snapshot/preview', {
+        method: 'POST',
+        body: JSON.stringify(buildDemoPayload()),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const body = await response.json()
+      setPublishPreview(body)
+      setPublishState('preview-ready')
+    } catch (err) {
+      setPublishError(err.message)
+      setPublishState('error')
+    }
+  }
+
+  async function handleConfirmPublish() {
+    setPublishState('publishing')
+    setPublishError(null)
+    try {
+      const response = await apiFetch('/demo-snapshot/publish', {
+        method: 'POST',
+        body: JSON.stringify(buildDemoPayload()),
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.detail?.message ?? `HTTP ${response.status}`)
+      }
+      setPublishState('published')
+      setPublishPreview(null)
+    } catch (err) {
+      setPublishError(err.message)
+      setPublishState('error')
+    }
+  }
+
+  function cancelPreview() {
+    setPublishState('idle')
+    setPublishPreview(null)
+    setPublishError(null)
+  }
+
+  async function handleRevokeDemo() {
+    setRevokeMessage(null)
+    try {
+      const response = await apiFetch('/demo-snapshot/revoke', { method: 'POST' })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const body = await response.json()
+      setRevokeMessage(
+        body.status === 'revoked' ? 'Demo despublicada -- visitantes não veem mais nenhum snapshot.' : 'Não havia demo publicada.',
+      )
+    } catch (err) {
+      setRevokeMessage(`Falha ao despublicar: ${err.message}`)
+    }
+  }
+
   function openReport(container) {
     const state = compat[container.name]
     if (state?.findings) setDetail({ kind: 'assess-result', container, findings: state.findings })
@@ -402,8 +500,76 @@ export default function Containers({ apiFetch, username, onLogout }) {
               >
                 {exportingConsolidated ? 'Exportando…' : 'Exportar relatório consolidado'}
               </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handlePreviewDemo}
+                disabled={busy || assessedContainers.length === 0 || publishState === 'previewing'}
+                title={assessedContainers.length === 0 ? 'Avalie pelo menos um container antes de publicar a demo.' : undefined}
+              >
+                {publishState === 'previewing' ? 'Gerando prévia…' : 'Publicar como demo'}
+              </button>
+              <button type="button" className="btn-secondary" onClick={handleRevokeDemo}>
+                Despublicar demo
+              </button>
             </div>
           </div>
+
+          {revokeMessage && <p className="hint">{revokeMessage}</p>}
+
+          {publishState === 'preview-ready' && publishPreview && (
+            <div className="demo-publish-panel">
+              <p className="flow-guide__title">Prévia da demo pública</p>
+              {publishPreview.ok ? (
+                <>
+                  <ul>
+                    {publishPreview.containers.map((c) => (
+                      <li key={c.name}>
+                        <strong className="mono">{c.name}</strong> ({c.image}) — {c.findings.length} findings
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button type="button" className="btn-primary" style={{ width: 'auto' }} onClick={handleConfirmPublish} disabled={publishState === 'publishing'}>
+                      {publishState === 'publishing' ? 'Publicando…' : 'Confirmar publicação'}
+                    </button>
+                    <button type="button" className="link-btn" onClick={cancelPreview}>
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="error">
+                    Não foi possível publicar a demo. Foram encontrados identificadores do ambiente real em campos do
+                    snapshot.
+                  </p>
+                  <ul>
+                    {publishPreview.issues.map((issue, i) => (
+                      <li key={`issue-${i}`} className="hint">
+                        {issue.field} — {issue.category}
+                      </li>
+                    ))}
+                    {publishPreview.unverified_container_ids.map((id) => (
+                      <li key={`unverified-${id}`} className="hint">
+                        Container não confirmado no ambiente atual: {id}
+                      </li>
+                    ))}
+                  </ul>
+                  <button type="button" className="link-btn" onClick={cancelPreview}>
+                    Fechar
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {publishState === 'published' && <p className="hint">Demo publicada com sucesso.</p>}
+          {publishState === 'error' && publishError && (
+            <p className="error" style={{ marginTop: '0.75rem' }}>
+              {publishError}
+            </p>
+          )}
 
           <FlowGuide />
 
@@ -471,6 +637,116 @@ export default function Containers({ apiFetch, username, onLogout }) {
           findings={detail.findings}
           apiFetch={apiFetch}
           containerImage={detail.container.image}
+          onSelectFinding={(finding) =>
+            setDetail({ kind: 'finding-detail', container: detail.container, findings: detail.findings, finding })
+          }
+          onBack={() => setDetail(null)}
+        />
+      )}
+      {detail?.kind === 'finding-detail' && (
+        <FindingDetail
+          finding={detail.finding}
+          onBack={() => setDetail({ kind: 'assess-result', container: detail.container, findings: detail.findings })}
+        />
+      )}
+    </div>
+  )
+}
+
+// Sem sessão, /containers vira a vitrine pública do produto (Home.jsx's
+// "Explorar demo") -- lê só GET /demo-snapshot (público, já sanitizado
+// pelo backend) e GET /demo-snapshot/report (também público, PDF gerado
+// a partir do snapshot ativo). Nunca chama /api/containers, /api/assess
+// nem /api/reports/pdf -- essas exigem sessão agora, de propósito
+// (routes/assess.py, routes/reports.py). Sem checkbox, sem seleção, sem
+// ação de avaliação -- só leitura do que o admin já publicou.
+function VisitorContainers({ apiFetch, onRequestLogin }) {
+  const [containers, setContainers] = useState([])
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState(null)
+  // null = lista de containers. Otherwise:
+  //   {kind:'assess-result', container, findings}
+  //   {kind:'finding-detail', container, findings, finding}
+  const [detail, setDetail] = useState(null)
+
+  useEffect(() => {
+    apiFetch('/demo-snapshot')
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.json()
+      })
+      .then((body) => setContainers(body.containers))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoaded(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function openReportUrl(kind, target) {
+    const params = new URLSearchParams({ kind })
+    if (target) params.set('target', target)
+    window.open(`${API_BASE}/demo-snapshot/report?${params.toString()}`, '_blank', 'noopener')
+  }
+
+  return (
+    <div className="page">
+      <header className="site-header">
+        <div className="brand">INVARIANT</div>
+        <div className="session-info">
+          <a href="/endpoints" className="link-btn">
+            Hosts Linux
+          </a>
+          <button type="button" className="btn-secondary" onClick={onRequestLogin}>
+            Entrar
+          </button>
+        </div>
+      </header>
+
+      <p className="demo-banner">Ambiente demonstrativo — resultados anonimizados de avaliações reais.</p>
+
+      {error && (
+        <p className="error" style={{ marginBottom: '1rem' }}>
+          {error}
+        </p>
+      )}
+
+      {!detail && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <h2 style={{ margin: 0 }}>Containers ({containers.length})</h2>
+            {containers.length >= MIN_CONSOLIDATED_TARGETS && (
+              <button type="button" className="btn-secondary" onClick={() => openReportUrl('consolidated')}>
+                Ver relatório consolidado
+              </button>
+            )}
+          </div>
+
+          {!loaded && <p className="hint">Carregando…</p>}
+          {loaded && containers.length === 0 && <p className="hint">Nenhuma demo publicada no momento.</p>}
+
+          <div className="card-grid" style={{ marginTop: '1rem' }}>
+            {containers.map((container) => (
+              <div key={container.name} className="target-card">
+                <div className="target-card__title mono">{container.name}</div>
+                <div className="hint" style={{ marginBottom: '0.5rem' }}>{container.image}</div>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => setDetail({ kind: 'assess-result', container, findings: container.findings })}
+                >
+                  Ver relatório →
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {detail?.kind === 'assess-result' && (
+        <FindingsReport
+          title={detail.container.name}
+          findings={detail.findings}
+          containerImage={detail.container.image}
+          onExportPdf={(kind) => openReportUrl(kind, detail.container.name)}
           onSelectFinding={(finding) =>
             setDetail({ kind: 'finding-detail', container: detail.container, findings: detail.findings, finding })
           }

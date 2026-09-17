@@ -69,7 +69,17 @@ export function EvidenceChain({ finding }) {
   )
 }
 
-export function FindingsReport({ title, findings, onSelectFinding, onBack, apiFetch, hostname, primaryIp, containerImage }) {
+export function FindingsReport({
+  title,
+  findings,
+  onSelectFinding,
+  onBack,
+  apiFetch,
+  hostname,
+  primaryIp,
+  containerImage,
+  onExportPdf,
+}) {
   // Explicit filters, not "anything not FAIL is PASS" -- today's pipeline
   // only ever produces PASS/FAIL, but the count must not silently misstate
   // the total if a third status (e.g. "NOT ASSESSED") ever shows up.
@@ -89,6 +99,14 @@ export function FindingsReport({ title, findings, onSelectFinding, onBack, apiFe
     : null
 
   async function handleExportPdf(kind) {
+    // Modo visitante da demo pública (Containers.jsx's VisitorContainers)
+    // passa isso pra apontar pro GET público /demo-snapshot/report em vez
+    // do POST /reports/pdf ao vivo (admin-only agora) -- o visitante nunca
+    // deve chamar a rota operacional, só ler o snapshot já publicado.
+    if (onExportPdf) {
+      onExportPdf(kind)
+      return
+    }
     setExporting(kind)
     try {
       const response = await apiFetch('/api/reports/pdf', {

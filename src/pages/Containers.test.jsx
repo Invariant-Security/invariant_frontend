@@ -15,7 +15,13 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function makeApiFetch({ containers = [{ name: 'tamois', image: 'tamois-img' }], checkResult = {}, findings = [] } = {}) {
+function makeApiFetch({
+  containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1' }],
+  checkResult = {},
+  findings = [],
+  previewResult = null,
+  publishResult = null,
+} = {}) {
   return vi.fn(async (path) => {
     if (path === '/api/containers') {
       return { ok: true, json: async () => containers }
@@ -31,6 +37,27 @@ function makeApiFetch({ containers = [{ name: 'tamois', image: 'tamois-img' }], 
     }
     if (path === '/api/reports/pdf') {
       return { ok: true, json: async () => ({}), blob: async () => new Blob() }
+    }
+    if (path === '/demo-snapshot/preview') {
+      return { ok: true, json: async () => previewResult ?? { ok: true, containers: [], issues: [], unverified_container_ids: [] } }
+    }
+    if (path === '/demo-snapshot/publish') {
+      if (publishResult?.status === 'error') {
+        return { ok: false, status: 422, json: async () => ({ detail: { message: publishResult.message } }) }
+      }
+      return { ok: true, json: async () => ({ status: 'published' }) }
+    }
+    if (path === '/demo-snapshot/revoke') {
+      return { ok: true, json: async () => (publishResult?.revoke ?? { status: 'revoked' }) }
+    }
+    return { ok: true, json: async () => ({}) }
+  })
+}
+
+function makeVisitorApiFetch({ containers = [] } = {}) {
+  return vi.fn(async (path) => {
+    if (path === '/demo-snapshot') {
+      return { ok: true, json: async () => ({ published_at: containers.length ? '2026-09-17T00:00:00Z' : null, containers }) }
     }
     return { ok: true, json: async () => ({}) }
   })
@@ -288,5 +315,203 @@ describe('Containers -- área clicável do card compatível', () => {
     fireEvent.click(checkbox)
 
     expect(card.className).toContain('target-card--selected')
+  })
+})
+
+describe('Containers -- modo visitante (demo pública, sem sessão)', () => {
+  it('busca /demo-snapshot, nunca /api/containers', async () => {
+    const apiFetch = makeVisitorApiFetch({
+      containers: [{ name: 'app-frontend', image: 'registry.example.com/demo-enterprise/frontend:2.4.1', findings: [] }],
+    })
+    render(<Containers apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('app-frontend'))
+
+    expect(apiFetch.mock.calls.some(([path]) => path === '/demo-snapshot')).toBe(true)
+    expect(apiFetch.mock.calls.some(([path]) => path === '/api/containers')).toBe(false)
+  })
+
+  it('mostra o aviso de ambiente demonstrativo', async () => {
+    const apiFetch = makeVisitorApiFetch()
+    render(<Containers apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText(/Ambiente demonstrativo/))
+  })
+
+  it('não mostra nenhum botão de ação operacional', async () => {
+    const apiFetch = makeVisitorApiFetch({
+      containers: [{ name: 'app-frontend', image: 'registry.example.com/demo-enterprise/frontend:2.4.1', findings: [] }],
+    })
+    render(<Containers apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('app-frontend'))
+
+    expect(screen.queryByText('Verificar compatibilidade')).toBeNull()
+    expect(screen.queryByText(/Executar selecionados/)).toBeNull()
+    expect(screen.queryByText('Exportar relatório consolidado')).toBeNull()
+    expect(screen.queryByText('Publicar como demo')).toBeNull()
+    expect(screen.queryByText('Sair')).toBeNull()
+  })
+
+  it('mostra "Entrar" em vez de usuário/Sair, e aciona onRequestLogin', async () => {
+    const apiFetch = makeVisitorApiFetch()
+    const onRequestLogin = vi.fn()
+    render(<Containers apiFetch={apiFetch} isVisitor onRequestLogin={onRequestLogin} />)
+
+    await waitFor(() => screen.getByText('Entrar'))
+    fireEvent.click(screen.getByText('Entrar'))
+
+    expect(onRequestLogin).toHaveBeenCalled()
+  })
+
+  it('sem nenhuma demo publicada, mostra mensagem amigável', async () => {
+    const apiFetch = makeVisitorApiFetch({ containers: [] })
+    render(<Containers apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('Nenhuma demo publicada no momento.'))
+  })
+
+  it('"Ver relatório →" abre os findings do snapshot sem chamar /api/assess', async () => {
+    const findings = [
+      {
+        target: 'app-frontend',
+        external_id: '5.1.20',
+        status: 'FAIL',
+        control_title: 'Ensure sshd PermitRootLogin is disabled',
+        source_name: 'cis',
+        document_name: 'debian_linux_12',
+        document_version: '2.0.0',
+        evidence_output: 'PermitRootLogin yes',
+        level: 1,
+        scored: true,
+      },
+    ]
+    const apiFetch = makeVisitorApiFetch({
+      containers: [{ name: 'app-frontend', image: 'registry.example.com/demo-enterprise/frontend:2.4.1', findings }],
+    })
+    render(<Containers apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('app-frontend'))
+    fireEvent.click(screen.getByText('Ver relatório →'))
+
+    await waitFor(() => screen.getByText('1 FAIL'))
+    expect(apiFetch.mock.calls.some(([path]) => path.startsWith('/api/assess/'))).toBe(false)
+  })
+
+  it('mostra "Ver relatório consolidado" só com 2+ containers, sem chamar /api/reports/pdf', async () => {
+    vi.stubGlobal('open', vi.fn())
+    const apiFetch = makeVisitorApiFetch({
+      containers: [
+        { name: 'app-frontend', image: 'registry.example.com/demo-enterprise/frontend:2.4.1', findings: [] },
+        { name: 'app-backend', image: 'registry.example.com/demo-enterprise/backend:1.9.3', findings: [] },
+      ],
+    })
+    render(<Containers apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('Ver relatório consolidado'))
+    fireEvent.click(screen.getByText('Ver relatório consolidado'))
+
+    expect(window.open).toHaveBeenCalledWith(expect.stringContaining('/demo-snapshot/report?kind=consolidated'), '_blank', 'noopener')
+    expect(apiFetch.mock.calls.some(([path]) => path === '/api/reports/pdf')).toBe(false)
+  })
+})
+
+describe('Containers -- painel admin de publicação da demo', () => {
+  it('"Publicar como demo" fica desabilitado sem nenhum assessment de sucesso', async () => {
+    await renderCheckedContainers()
+
+    const publishBtn = screen.getByText('Publicar como demo')
+    expect(publishBtn.disabled).toBe(true)
+  })
+
+  it('preview limpo mostra os containers com alias e o botão de confirmar', async () => {
+    const apiFetch = await renderCheckedContainers()
+    apiFetch.mockImplementation(
+      makeApiFetch({
+        previewResult: {
+          ok: true,
+          containers: [{ name: 'app-frontend', image: 'registry.example.com/demo-enterprise/frontend:2.4.1', findings: [] }],
+          issues: [],
+          unverified_container_ids: [],
+        },
+      }),
+    )
+    fireEvent.click(screen.getByText('Executar avaliação →'))
+    await waitFor(() => screen.getByText('← Back'))
+    fireEvent.click(screen.getByText('← Back'))
+
+    fireEvent.click(screen.getByText('Publicar como demo'))
+
+    await waitFor(() => screen.getByText('Confirmar publicação'))
+    screen.getByText(/app-frontend/)
+  })
+
+  it('preview com issues não mostra botão de confirmar', async () => {
+    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1' }]
+    const apiFetch = vi.fn(async (path) => {
+      if (path === '/api/containers') return { ok: true, json: async () => containers }
+      if (path.endsWith('/check')) return { ok: true, json: async () => ({ testable: true, os_id: 'debian', os_version_id: '12', reason: null }) }
+      if (path.startsWith('/api/assess/')) return { ok: true, json: async () => [] }
+      if (path === '/demo-snapshot/preview') {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: false,
+            containers: [],
+            issues: [{ field: 'containers[0].findings[0].evidence_output', category: 'container_name' }],
+            unverified_container_ids: [],
+          }),
+        }
+      }
+      return { ok: true, json: async () => ({}) }
+    })
+    render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (1)') }))
+    fireEvent.click(screen.getByText('Verificar compatibilidade'))
+    await waitFor(() => screen.getByText('tamois'))
+    fireEvent.click(screen.getByText('Executar avaliação →'))
+    await waitFor(() => screen.getByText('← Back'))
+    fireEvent.click(screen.getByText('← Back'))
+
+    fireEvent.click(screen.getByText('Publicar como demo'))
+
+    await waitFor(() => screen.getByText(/identificadores do ambiente real/))
+    expect(screen.queryByText('Confirmar publicação')).toBeNull()
+    screen.getByText(/container_name/)
+  })
+
+  it('manda só container_id + findings no payload de publish (nunca name/image)', async () => {
+    const findings = [{ target: 'tamois', external_id: '5.1.20', status: 'FAIL' }]
+    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1' }]
+    const apiFetch = vi.fn(async (path) => {
+      if (path === '/api/containers') return { ok: true, json: async () => containers }
+      if (path.endsWith('/check')) return { ok: true, json: async () => ({ testable: true, os_id: 'debian', os_version_id: '12', reason: null }) }
+      if (path.startsWith('/api/assess/')) return { ok: true, json: async () => findings }
+      if (path === '/demo-snapshot/preview') return { ok: true, json: async () => ({ ok: true, containers: [], issues: [], unverified_container_ids: [] }) }
+      return { ok: true, json: async () => ({}) }
+    })
+    render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (1)') }))
+    fireEvent.click(screen.getByText('Verificar compatibilidade'))
+    await waitFor(() => screen.getByText('tamois'))
+    fireEvent.click(screen.getByText('Executar avaliação →'))
+    await waitFor(() => screen.getByText('← Back'))
+    fireEvent.click(screen.getByText('← Back'))
+
+    fireEvent.click(screen.getByText('Publicar como demo'))
+
+    await waitFor(() => expect(apiFetch.mock.calls.some(([path]) => path === '/demo-snapshot/preview')).toBe(true))
+    const call = apiFetch.mock.calls.find(([path]) => path === '/demo-snapshot/preview')
+    const body = JSON.parse(call[1].body)
+    expect(body).toEqual({ containers: [{ container_id: 'real-id-1', findings }] })
+  })
+
+  it('"Despublicar demo" chama /demo-snapshot/revoke e mostra confirmação', async () => {
+    const apiFetch = await renderCheckedContainers()
+
+    fireEvent.click(screen.getByText('Despublicar demo'))
+
+    await waitFor(() => screen.getByText(/Demo despublicada/))
+    expect(apiFetch.mock.calls.some(([path, options]) => path === '/demo-snapshot/revoke' && options?.method === 'POST')).toBe(true)
   })
 })

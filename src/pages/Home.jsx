@@ -119,7 +119,7 @@ function LeadForm() {
         <p>Nosso time entrará em contato para entender seu ambiente e apresentar o Invariant.</p>
         <p className="lead-success-hint">Enquanto isso, você pode ver a demo ao vivo:</p>
         <a className="secondary-action" href="/containers">
-          Ver demo ao vivo <ExternalLink size={16} />
+          Explorar demo <ExternalLink size={16} />
         </a>
       </div>
     )
@@ -297,7 +297,7 @@ export default function Home() {
           <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
           <button onClick={() => scrollTo('mercado')}>Mercado</button>
           <button onClick={() => scrollTo('planos')}>Falar com a gente</button>
-          <a href="/containers">Ver demo</a>
+          <a href="/containers">Explorar demo</a>
         </nav>
 
         <button className="menu-toggle" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Abrir menu">
@@ -308,7 +308,7 @@ export default function Home() {
             <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
             <button onClick={() => scrollTo('mercado')}>Mercado</button>
             <button onClick={() => scrollTo('planos')}>Falar com a gente</button>
-            <a href="/containers">Ver demo</a>
+            <a href="/containers">Explorar demo</a>
           </div>
         )}
       </header>
@@ -333,7 +333,7 @@ export default function Home() {
                 Falar com a gente <ArrowDownRight size={18} />
               </button>
               <a className="secondary-action" href="/containers">
-                Ver demo ao vivo <ExternalLink size={16} />
+                Explorar demo <ExternalLink size={16} />
               </a>
             </div>
           </div>
@@ -520,7 +520,7 @@ export default function Home() {
 
       <footer className="site-footer">
         <div className="footer-brand">Invariant</div>
-        <p>© 2026 Invariant Security. <a href="/containers">Ver demo</a></p>
+        <p>© 2026 Invariant Security. <a href="/containers">Explorar demo</a></p>
         <a href="https://github.com/Invariant-Security/Invariant" target="_blank" rel="noreferrer">
           Repositório público <ExternalLink size={14} />
         </a>
