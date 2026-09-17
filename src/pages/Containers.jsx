@@ -182,6 +182,83 @@ function InfoCard({ container, reason }) {
   )
 }
 
+// Um bloco de renderização por ambiente (demonstrativo/operacional) --
+// mesma lógica que antes era calculada uma vez só pra todos os
+// containers, agora reaplicada a cada subconjunto (container.is_demo)
+// antes de renderizar. CompatibleCard/InfoCard/UncheckedCard e o fluxo
+// de seleção/avaliação são idênticos nos dois ambientes -- só
+// "Publicar como demo" trata os dois de forma diferente (ver
+// assessedContainers em AdminContainers).
+function ContainerSection({ heading, groupContainers, checked, compat, busy, onToggleSelected, onRun }) {
+  if (groupContainers.length === 0) return null
+
+  const supported = groupContainers.filter((c) => compat[c.name]?.checkStatus === 'supported')
+  const unsupported = groupContainers.filter((c) => compat[c.name]?.checkStatus === 'unsupported')
+  const checking = groupContainers.filter((c) => compat[c.name]?.checkStatus === 'checking')
+  const checkFailed = groupContainers.filter((c) => compat[c.name]?.checkStatus === 'error')
+
+  return (
+    <section style={{ marginTop: '2rem' }}>
+      <h3 style={{ marginBottom: '0.5rem' }}>
+        {heading} ({groupContainers.length})
+      </h3>
+
+      {!checked && (
+        <div className="card-grid">
+          {groupContainers.map((container) => (
+            <UncheckedCard key={container.name} container={container} />
+          ))}
+        </div>
+      )}
+
+      {checked && (
+        <>
+          {checking.length > 0 && <p className="hint">Verificando compatibilidade… ({checking.length} restantes)</p>}
+
+          <h4 className="finding-group" style={{ marginTop: '1rem' }}>Compatíveis ({supported.length})</h4>
+          {supported.length === 0 && <p className="hint">Nenhum container compatível encontrado.</p>}
+          <div className="card-grid">
+            {supported.map((container) => (
+              <CompatibleCard
+                key={container.name}
+                container={container}
+                state={compat[container.name]}
+                busy={busy}
+                onToggleSelected={onToggleSelected}
+                onRun={onRun}
+              />
+            ))}
+          </div>
+
+          {unsupported.length > 0 && (
+            <>
+              <h4 className="finding-group" style={{ marginTop: '1.5rem' }}>Não compatíveis ({unsupported.length})</h4>
+              <div className="card-grid">
+                {unsupported.map((container) => (
+                  <InfoCard key={container.name} container={container} reason={compat[container.name]?.reason} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {checkFailed.length > 0 && (
+            <>
+              <h4 className="finding-group finding-group--warning" style={{ marginTop: '1.5rem' }}>
+                Falha na verificação ({checkFailed.length})
+              </h4>
+              <div className="card-grid">
+                {checkFailed.map((container) => (
+                  <InfoCard key={container.name} container={container} reason={compat[container.name]?.reason} />
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
 // /containers é o ponto de entrada da demo pública (Home.jsx's "Explorar
 // demo") -- sem sessão, App.jsx renderiza <VisitorContainers> em vez
 // deste componente (ver seu próprio comentário mais abaixo). Isso aqui
@@ -228,10 +305,11 @@ function AdminContainers({ apiFetch, username, onLogout }) {
   }
 
   const checked = Object.keys(compat).length > 0
+  // "Compatível" atravessa os dois ambientes (demo/operacional) -- usado
+  // só pra selectedCount/readyToExport/consolidado, que continuam
+  // funcionando sobre qualquer container. A separação visual por
+  // container.is_demo acontece dentro de ContainerSection, não aqui.
   const supported = containers.filter((c) => compat[c.name]?.checkStatus === 'supported')
-  const unsupported = containers.filter((c) => compat[c.name]?.checkStatus === 'unsupported')
-  const checking = containers.filter((c) => compat[c.name]?.checkStatus === 'checking')
-  const checkFailed = containers.filter((c) => compat[c.name]?.checkStatus === 'error')
   const selectedCount = supported.filter((c) => compat[c.name]?.selected).length
   // Live selection, not a frozen batch snapshot: any container currently
   // checked AND already successfully assessed counts, regardless of
@@ -370,11 +448,16 @@ function AdminContainers({ apiFetch, username, onLogout }) {
     }
   }
 
-  // Tudo que já foi avaliado com sucesso entra na demo -- não é filtrado
-  // pela seleção viva (checkbox), que é um conceito só do "Executar
-  // selecionados"/consolidado ao vivo. Publicar a demo é uma ação
+  // Só ativos do Ambiente demonstrativo (container.is_demo, label
+  // invariant.public-demo=true, ver demo_lab/) entram no lote de
+  // publicação -- o backend já recusa qualquer outro
+  // (not_demo_container_ids em routes/demo_snapshot.py), esse filtro
+  // aqui é só UX: evita o admin selecionar um container operacional já
+  // avaliado e tomar um 422 sem entender por quê. Não é filtrado pela
+  // seleção viva (checkbox), que é um conceito só do "Executar
+  // selecionados"/consolidado ao vivo -- publicar a demo é uma ação
   // separada, sobre tudo que existe de resultado no momento.
-  const assessedContainers = containers.filter((c) => compat[c.name]?.assessmentStatus === 'success')
+  const assessedContainers = containers.filter((c) => c.is_demo && compat[c.name]?.assessmentStatus === 'success')
 
   function buildDemoPayload() {
     return {
@@ -512,7 +595,11 @@ function AdminContainers({ apiFetch, username, onLogout }) {
                 className="btn-secondary"
                 onClick={handlePreviewDemo}
                 disabled={busy || assessedContainers.length === 0 || publishState === 'previewing'}
-                title={assessedContainers.length === 0 ? 'Avalie pelo menos um container antes de publicar a demo.' : undefined}
+                title={
+                  assessedContainers.length === 0
+                    ? 'Avalie pelo menos um container do Ambiente demonstrativo antes de publicar a demo.'
+                    : undefined
+                }
               >
                 {publishState === 'previewing' ? 'Gerando prévia…' : 'Publicar como demo'}
               </button>
@@ -562,6 +649,11 @@ function AdminContainers({ apiFetch, username, onLogout }) {
                         Container não confirmado no ambiente atual: {id}
                       </li>
                     ))}
+                    {(publishPreview.not_demo_container_ids ?? []).map((id) => (
+                      <li key={`not-demo-${id}`} className="hint">
+                        Container não pertence ao Ambiente demonstrativo, não pode ser publicado: {id}
+                      </li>
+                    ))}
                   </ul>
                   <button type="button" className="link-btn" onClick={cancelPreview}>
                     Fechar
@@ -583,58 +675,24 @@ function AdminContainers({ apiFetch, username, onLogout }) {
           {!loaded && <p className="hint">Carregando…</p>}
           {loaded && containers.length === 0 && <p className="hint">Nenhum container encontrado neste host.</p>}
 
-          {!checked && (
-            <div className="card-grid" style={{ marginTop: '1rem' }}>
-              {containers.map((container) => (
-                <UncheckedCard key={container.name} container={container} />
-              ))}
-            </div>
-          )}
-
-          {checked && (
-            <>
-              {checking.length > 0 && <p className="hint">Verificando compatibilidade… ({checking.length} restantes)</p>}
-
-              <h4 className="finding-group" style={{ marginTop: '1.5rem' }}>Compatíveis ({supported.length})</h4>
-              {supported.length === 0 && <p className="hint">Nenhum container compatível encontrado.</p>}
-              <div className="card-grid">
-                {supported.map((container) => (
-                  <CompatibleCard
-                    key={container.name}
-                    container={container}
-                    state={compat[container.name]}
-                    busy={busy}
-                    onToggleSelected={toggleSelected}
-                    onRun={handleCardAction}
-                  />
-                ))}
-              </div>
-
-              {unsupported.length > 0 && (
-                <>
-                  <h4 className="finding-group" style={{ marginTop: '1.5rem' }}>Não compatíveis ({unsupported.length})</h4>
-                  <div className="card-grid">
-                    {unsupported.map((container) => (
-                      <InfoCard key={container.name} container={container} reason={compat[container.name]?.reason} />
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {checkFailed.length > 0 && (
-                <>
-                  <h4 className="finding-group finding-group--warning" style={{ marginTop: '1.5rem' }}>
-                    Falha na verificação ({checkFailed.length})
-                  </h4>
-                  <div className="card-grid">
-                    {checkFailed.map((container) => (
-                      <InfoCard key={container.name} container={container} reason={compat[container.name]?.reason} />
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
-          )}
+          <ContainerSection
+            heading="Ambiente demonstrativo"
+            groupContainers={containers.filter((c) => c.is_demo)}
+            checked={checked}
+            compat={compat}
+            busy={busy}
+            onToggleSelected={toggleSelected}
+            onRun={handleCardAction}
+          />
+          <ContainerSection
+            heading="Ambiente operacional"
+            groupContainers={containers.filter((c) => !c.is_demo)}
+            checked={checked}
+            compat={compat}
+            busy={busy}
+            onToggleSelected={toggleSelected}
+            onRun={handleCardAction}
+          />
         </>
       )}
 
@@ -708,7 +766,10 @@ function VisitorContainers({ apiFetch, onRequestLogin }) {
         </div>
       </header>
 
-      <p className="demo-banner">Ambiente demonstrativo — resultados anonimizados de avaliações reais.</p>
+      <p className="demo-banner">
+        Ambiente demonstrativo — avaliações reais executadas contra sistemas preparados exclusivamente para
+        demonstração.
+      </p>
 
       {error && (
         <p className="error" style={{ marginBottom: '1rem' }}>

@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 function makeApiFetch({
-  containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1' }],
+  containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1', is_demo: true }],
   checkResult = {},
   findings = [],
   previewResult = null,
@@ -258,6 +258,33 @@ describe('Containers -- botão de exportar consolidado', () => {
   })
 })
 
+describe('Containers -- separação visual Ambiente demonstrativo/operacional', () => {
+  it('agrupa containers demo e operacionais em seções separadas, por container.is_demo', async () => {
+    const containers = [
+      { name: 'demo-web-01', image: 'demo-lab/web:1', id: 'demo-id-1', is_demo: true },
+      { name: 'tamois', image: 'tamois-img', id: 'real-id-1', is_demo: false },
+    ]
+    const apiFetch = makeApiFetch({ containers })
+    render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (2)') }))
+
+    screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') })
+    screen.getByRole('heading', { name: headingMatcher('Ambiente operacional (1)') })
+    screen.getByText('demo-web-01')
+    screen.getByText('tamois')
+  })
+
+  it('não mostra a seção operacional quando todo container é demo', async () => {
+    const containers = [{ name: 'demo-web-01', image: 'demo-lab/web:1', id: 'demo-id-1', is_demo: true }]
+    const apiFetch = makeApiFetch({ containers })
+    render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (1)') }))
+
+    screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') })
+    expect(screen.queryByText(/Ambiente operacional/)).toBeNull()
+  })
+})
+
 describe('Containers -- área clicável do card compatível', () => {
   it('clicar no checkbox seleciona o container', async () => {
     await renderCheckedContainers()
@@ -447,7 +474,7 @@ describe('Containers -- painel admin de publicação da demo', () => {
   })
 
   it('preview com issues não mostra botão de confirmar', async () => {
-    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1' }]
+    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1', is_demo: true }]
     const apiFetch = vi.fn(async (path) => {
       if (path === '/api/containers') return { ok: true, json: async () => containers }
       if (path.endsWith('/check')) return { ok: true, json: async () => ({ testable: true, os_id: 'debian', os_version_id: '12', reason: null }) }
@@ -482,7 +509,7 @@ describe('Containers -- painel admin de publicação da demo', () => {
 
   it('manda só container_id + findings no payload de publish (nunca name/image)', async () => {
     const findings = [{ target: 'tamois', external_id: '5.1.20', status: 'FAIL' }]
-    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1' }]
+    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1', is_demo: true }]
     const apiFetch = vi.fn(async (path) => {
       if (path === '/api/containers') return { ok: true, json: async () => containers }
       if (path.endsWith('/check')) return { ok: true, json: async () => ({ testable: true, os_id: 'debian', os_version_id: '12', reason: null }) }
@@ -515,11 +542,31 @@ describe('Containers -- painel admin de publicação da demo', () => {
     expect(apiFetch.mock.calls.some(([path, options]) => path === '/demo-snapshot/revoke' && options?.method === 'POST')).toBe(true)
   })
 
+  it('avaliar com sucesso um container sem is_demo não habilita "Publicar como demo" (só ativos do Ambiente demonstrativo entram no lote)', async () => {
+    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1', is_demo: false }]
+    const apiFetch = vi.fn(async (path) => {
+      if (path === '/api/containers') return { ok: true, json: async () => containers }
+      if (path.endsWith('/check')) return { ok: true, json: async () => ({ testable: true, os_id: 'debian', os_version_id: '12', reason: null }) }
+      if (path.startsWith('/api/assess/')) return { ok: true, json: async () => [] }
+      return { ok: true, json: async () => ({}) }
+    })
+    render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (1)') }))
+    fireEvent.click(screen.getByText('Verificar compatibilidade'))
+    await waitFor(() => screen.getByText('tamois'))
+    fireEvent.click(screen.getByText('Executar avaliação →'))
+    await waitFor(() => screen.getByText('← Back'))
+    fireEvent.click(screen.getByText('← Back'))
+
+    const publishBtn = screen.getByText('Publicar como demo')
+    expect(publishBtn.disabled).toBe(true)
+  })
+
   it('"Despublicar demo" limpa um erro de publicação anterior, em vez de empilhar as duas mensagens', async () => {
     // Reproduz o bug relatado: um 413/422 de "Publicar como demo" que
     // ficava na tela ao mesmo tempo que a confirmação de "Despublicar
     // demo" seguinte, parecendo que a segunda ação também tinha falhado.
-    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1' }]
+    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1', is_demo: true }]
     const apiFetch = vi.fn(async (path) => {
       if (path === '/api/containers') return { ok: true, json: async () => containers }
       if (path.endsWith('/check')) return { ok: true, json: async () => ({ testable: true, os_id: 'debian', os_version_id: '12', reason: null }) }
