@@ -514,4 +514,34 @@ describe('Containers -- painel admin de publicação da demo', () => {
     await waitFor(() => screen.getByText(/Demo despublicada/))
     expect(apiFetch.mock.calls.some(([path, options]) => path === '/demo-snapshot/revoke' && options?.method === 'POST')).toBe(true)
   })
+
+  it('"Despublicar demo" limpa um erro de publicação anterior, em vez de empilhar as duas mensagens', async () => {
+    // Reproduz o bug relatado: um 413/422 de "Publicar como demo" que
+    // ficava na tela ao mesmo tempo que a confirmação de "Despublicar
+    // demo" seguinte, parecendo que a segunda ação também tinha falhado.
+    const containers = [{ name: 'tamois', image: 'tamois-img', id: 'real-id-1' }]
+    const apiFetch = vi.fn(async (path) => {
+      if (path === '/api/containers') return { ok: true, json: async () => containers }
+      if (path.endsWith('/check')) return { ok: true, json: async () => ({ testable: true, os_id: 'debian', os_version_id: '12', reason: null }) }
+      if (path.startsWith('/api/assess/')) return { ok: true, json: async () => [] }
+      if (path === '/demo-snapshot/preview') return { ok: false, status: 413, json: async () => ({}) }
+      if (path === '/demo-snapshot/revoke') return { ok: true, json: async () => ({ status: 'revoked' }) }
+      return { ok: true, json: async () => ({}) }
+    })
+    render(<Containers apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Containers (1)') }))
+    fireEvent.click(screen.getByText('Verificar compatibilidade'))
+    await waitFor(() => screen.getByText('tamois'))
+    fireEvent.click(screen.getByText('Executar avaliação →'))
+    await waitFor(() => screen.getByText('← Back'))
+    fireEvent.click(screen.getByText('← Back'))
+
+    fireEvent.click(screen.getByText('Publicar como demo'))
+    await waitFor(() => screen.getByText('HTTP 413'))
+
+    fireEvent.click(screen.getByText('Despublicar demo'))
+    await waitFor(() => screen.getByText(/Demo despublicada/))
+
+    expect(screen.queryByText('HTTP 413')).toBeNull()
+  })
 })

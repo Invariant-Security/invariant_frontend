@@ -433,6 +433,13 @@ function AdminContainers({ apiFetch, username, onLogout }) {
 
   async function handleRevokeDemo() {
     setRevokeMessage(null)
+    // Limpa qualquer erro/prévia de uma tentativa de publicação anterior --
+    // sem isso, um 413/422 de um "Publicar como demo" anterior ficava
+    // empilhado na tela junto com a mensagem de sucesso do revoke, dando
+    // a impressão de que a ação atual também tinha falhado.
+    setPublishState('idle')
+    setPublishError(null)
+    setPublishPreview(null)
     try {
       const response = await apiFetch('/demo-snapshot/revoke', { method: 'POST' })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
