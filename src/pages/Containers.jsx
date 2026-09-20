@@ -632,6 +632,23 @@ function AdminContainers({ apiFetch, username, onLogout }) {
                     </button>
                   </div>
                 </>
+              ) : publishPreview.redaction_issues?.length > 0 ? (
+                <>
+                  <p className="error">
+                    Não foi possível publicar a demo: a própria sanitização falhou -- um identificador real do
+                    ambiente sobreviveu num campo do snapshot depois da substituição pelo alias.
+                  </p>
+                  <ul>
+                    {publishPreview.redaction_issues.map((issue, i) => (
+                      <li key={`redaction-${i}`} className="hint">
+                        {issue.field} — {issue.category}
+                      </li>
+                    ))}
+                  </ul>
+                  <button type="button" className="link-btn" onClick={cancelPreview}>
+                    Fechar
+                  </button>
+                </>
               ) : (
                 <>
                   <p className="error">
