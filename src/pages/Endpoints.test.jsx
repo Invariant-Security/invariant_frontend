@@ -37,20 +37,20 @@ function makeApiFetch({
     if (/\/api\/endpoints\/\d+\/assess$/.test(path)) {
       return { ok: true, json: async () => findings }
     }
-    if (path === '/demo-host-snapshot/preview') {
+    if (path === '/api/demo-host-snapshot/preview') {
       return {
         ok: true,
         json: async () =>
           previewResult ?? { ok: true, hosts: [], issues: [], unverified_endpoint_ids: [], not_demo_endpoint_ids: [], redaction_issues: [] },
       }
     }
-    if (path === '/demo-host-snapshot/publish') {
+    if (path === '/api/demo-host-snapshot/publish') {
       if (publishResult?.status === 'error') {
         return { ok: false, status: 422, json: async () => ({ detail: { message: publishResult.message } }) }
       }
       return { ok: true, json: async () => ({ status: 'published' }) }
     }
-    if (path === '/demo-host-snapshot/revoke') {
+    if (path === '/api/demo-host-snapshot/revoke') {
       return { ok: true, json: async () => (publishResult?.revoke ?? { status: 'revoked' }) }
     }
     return { ok: true, json: async () => ({}) }
@@ -451,28 +451,28 @@ describe('Endpoints -- painel admin de publicação da demo', () => {
 
     fireEvent.click(screen.getByText('Publicar como demo'))
 
-    await waitFor(() => expect(apiFetch.mock.calls.some(([path]) => path === '/demo-host-snapshot/preview')).toBe(true))
-    const call = apiFetch.mock.calls.find(([path]) => path === '/demo-host-snapshot/preview')
+    await waitFor(() => expect(apiFetch.mock.calls.some(([path]) => path === '/api/demo-host-snapshot/preview')).toBe(true))
+    const call = apiFetch.mock.calls.find(([path]) => path === '/api/demo-host-snapshot/preview')
     const body = JSON.parse(call[1].body)
     expect(body).toEqual({ hosts: [{ endpoint_id: 1, findings }] })
   })
 
-  it('"Despublicar demo" chama /demo-host-snapshot/revoke e mostra confirmação', async () => {
+  it('"Despublicar demo" chama /api/demo-host-snapshot/revoke e mostra confirmação', async () => {
     const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
     const apiFetch = await renderEndpoints({ endpoints })
 
     fireEvent.click(screen.getByText('Despublicar demo'))
 
     await waitFor(() => screen.getByText(/Demo despublicada/))
-    expect(apiFetch.mock.calls.some(([path, options]) => path === '/demo-host-snapshot/revoke' && options?.method === 'POST')).toBe(true)
+    expect(apiFetch.mock.calls.some(([path, options]) => path === '/api/demo-host-snapshot/revoke' && options?.method === 'POST')).toBe(true)
   })
 
   it('"Despublicar demo" limpa um erro de publicação anterior, em vez de empilhar as duas mensagens', async () => {
     const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
     const apiFetch = await renderAssessedEndpoint({ endpoints })
     apiFetch.mockImplementation(async (path, options = {}) => {
-      if (path === '/demo-host-snapshot/preview') return { ok: false, status: 413, json: async () => ({}) }
-      if (path === '/demo-host-snapshot/revoke') return { ok: true, json: async () => ({ status: 'revoked' }) }
+      if (path === '/api/demo-host-snapshot/preview') return { ok: false, status: 413, json: async () => ({}) }
+      if (path === '/api/demo-host-snapshot/revoke') return { ok: true, json: async () => ({ status: 'revoked' }) }
       if (path === '/api/endpoints' && (!options.method || options.method === 'GET')) return { ok: true, json: async () => endpoints }
       return { ok: true, json: async () => ({}) }
     })

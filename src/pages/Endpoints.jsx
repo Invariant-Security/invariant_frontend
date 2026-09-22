@@ -607,13 +607,20 @@ function AdminEndpoints({ apiFetch, username, onLogout }) {
     }
   }
 
+  // Só via /api/demo-host-snapshot/... aqui, nunca o path bare -- ao
+  // contrário de Containers.jsx (que reaproveita o mesmo /demo-snapshot
+  // bare pra GET público e POST admin, protegido só pela sessão dentro
+  // do FastAPI), o nginx de teste/produção só expõe location = pros dois
+  // GETs bare de host (ver demo_lab/docs/networking.md e o proxy repo) --
+  // POST preview/publish/revoke só existe atrás de /api/, que passa pela
+  // location genérica /api/ (rewrite -> backend) e por require_admin_session.
   async function handlePreviewDemo() {
     if (assessedEndpoints.length === 0) return
     setPublishState('previewing')
     setPublishError(null)
     setRevokeMessage(null)
     try {
-      const response = await apiFetch('/demo-host-snapshot/preview', {
+      const response = await apiFetch('/api/demo-host-snapshot/preview', {
         method: 'POST',
         body: JSON.stringify(buildDemoPayload()),
       })
@@ -631,7 +638,7 @@ function AdminEndpoints({ apiFetch, username, onLogout }) {
     setPublishState('publishing')
     setPublishError(null)
     try {
-      const response = await apiFetch('/demo-host-snapshot/publish', {
+      const response = await apiFetch('/api/demo-host-snapshot/publish', {
         method: 'POST',
         body: JSON.stringify(buildDemoPayload()),
       })
@@ -663,7 +670,7 @@ function AdminEndpoints({ apiFetch, username, onLogout }) {
     setPublishError(null)
     setPublishPreview(null)
     try {
-      const response = await apiFetch('/demo-host-snapshot/revoke', { method: 'POST' })
+      const response = await apiFetch('/api/demo-host-snapshot/revoke', { method: 'POST' })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const body = await response.json()
       setRevokeMessage(
