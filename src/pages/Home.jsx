@@ -334,9 +334,8 @@ export default function Home() {
               O que não se consegue <em>explicar</em>, não se consegue defender.
             </h1>
             <p className="hero-lead">
-              Sem agentes pesados, sem senha ou chave SSH guardada no banco: a Invariant avalia hosts Linux e
-              containers Docker contra ~199 controles CIS Benchmark e devolve evidência auditável — finding,
-              controle, fonte e versão, prontos pra sustentar uma auditoria.
+              O Invariant avalia hardening e configurações de segurança em hosts Linux e containers Docker, coleta
+              evidências e gera resultados auditáveis. A primeira baseline suportada é CIS.
             </p>
             <div className="hero-actions">
               <button className="primary-action" onClick={() => scrollTo('planos')}>
