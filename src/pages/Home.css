@@ -664,20 +664,9 @@
   font-size: 0.78rem;
   color: var(--ink-soft);
 }
-.lead-form .lead-consent {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0.55rem;
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-}
-.lead-consent input[type='checkbox'] {
-  accent-color: var(--accent);
-  width: 1.05rem;
-  height: 1.05rem;
-  margin-top: 0.15rem;
-  flex-shrink: 0;
+.lead-form-privacy a {
+  color: var(--accent);
+  font-weight: 600;
 }
 .lead-form-status {
   margin: 0;
@@ -789,6 +778,10 @@
   font-weight: 800;
   color: #fff;
   font-size: 1.1rem;
+}
+.footer-legal-links {
+  font-size: 0.78rem;
+  opacity: 0.75;
 }
 .site-footer a {
   color: var(--accent);

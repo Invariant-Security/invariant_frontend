@@ -7,6 +7,9 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 const Demo = lazy(() => import('./pages/Demo.jsx'))
 const Home = lazy(() => import('./pages/Home.jsx'))
 const Historia = lazy(() => import('./pages/Historia.jsx'))
+const Privacidade = lazy(() => import('./pages/Privacidade.jsx'))
+const Cookies = lazy(() => import('./pages/Cookies.jsx'))
+const Termos = lazy(() => import('./pages/Termos.jsx'))
 const Setup = lazy(() => import('./pages/Setup.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Endpoints = lazy(() => import('./pages/Endpoints.jsx'))
@@ -95,7 +98,19 @@ export default function App() {
   return (
     <Suspense fallback={null}>
       {!isConsoleRoute &&
-        (path === '/demo' ? <Demo /> : path === '/nossa-historia' ? <Historia /> : <Home />)}
+        (path === '/demo' ? (
+          <Demo />
+        ) : path === '/nossa-historia' ? (
+          <Historia />
+        ) : path === '/privacidade' ? (
+          <Privacidade />
+        ) : path === '/cookies' ? (
+          <Cookies />
+        ) : path === '/termos' ? (
+          <Termos />
+        ) : (
+          <Home />
+        ))}
 
       {isEndpointsRoute && showAuthScreen && authGate?.mode === 'setup' && (
         <Setup apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />

@@ -1,0 +1,154 @@
+/* Compartilhado só entre as 3 páginas jurídicas (Privacidade, Cookies,
+   Termos) -- exceção deliberada à convenção de "cada página lazy-loaded
+   carrega só o CSS que precisa" (ver Console.css): essas 3 formam uma
+   família coesa de páginas de texto estático, com o mesmo layout exato,
+   então compartilhar evita triplicar o mesmo arquivo. Mesma identidade
+   visual de Home.css/Historia.css (Azul Profundo/Verde Tecnológico/
+   marfim) -- tokens redeclarados aqui, não importados de lá. */
+
+.legal-shell {
+  --ink: #0b2842;
+  --ink-soft: #33506b;
+  --paper: #f7f5ef;
+  --paper-raised: #ffffff;
+  --line: #d9d3c4;
+  --accent: #05a67c;
+  --accent-soft: #e3f5ef;
+  --amber: #f2a93b;
+
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Manrope', system-ui, sans-serif;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+}
+
+.legal-shell h1,
+.legal-shell h2 {
+  font-family: 'Sora', 'Manrope', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.legal-shell .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #05684f;
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  margin: 0 0 0.5rem;
+}
+
+.legal-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem clamp(1.25rem, 4vw, 3rem);
+  background: rgba(247, 245, 239, 0.92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+.legal-header .wordmark {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+.legal-back-link {
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.legal-back-link:hover {
+  color: var(--accent);
+}
+
+.legal-main {
+  flex: 1;
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: clamp(3rem, 7vw, 5rem) clamp(1.25rem, 4vw, 3rem) 4rem;
+  width: 100%;
+}
+.legal-main h1 {
+  font-size: clamp(1.8rem, 5vw, 2.4rem);
+  text-wrap: balance;
+  margin: 0;
+}
+.legal-updated {
+  margin-top: 0.75rem;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-family: 'DM Mono', monospace;
+}
+.legal-main section {
+  margin-top: 2.25rem;
+}
+.legal-main h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.65rem;
+}
+.legal-main p,
+.legal-main li {
+  color: var(--ink-soft);
+  margin: 0 0 0.75rem;
+}
+.legal-main ul {
+  padding-left: 1.2rem;
+}
+.legal-main a {
+  color: var(--accent);
+  font-weight: 600;
+}
+.legal-main strong {
+  color: var(--ink);
+}
+
+/* Marca visualmente uma pendência que só o Victor pode preencher (CNPJ,
+   endereço, e-mail de contato específico, etc.) -- nunca deixar isso
+   parecer texto final antes de ser revisado. */
+.legal-pending {
+  display: inline-block;
+  background: #fdf3e3;
+  border: 1px solid #f0d6a1;
+  color: #7a4a12;
+  border-radius: 6px;
+  padding: 0.1rem 0.4rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.85em;
+}
+
+.legal-footer {
+  background: var(--ink);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 2.5rem clamp(1.25rem, 4vw, 3rem);
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  text-align: center;
+  font-size: 0.85rem;
+}
+.legal-footer .footer-brand {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  color: #fff;
+  font-size: 1.1rem;
+}
+.legal-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
