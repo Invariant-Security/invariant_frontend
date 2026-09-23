@@ -1,0 +1,178 @@
+/* Mesma identidade visual de Home.css (Azul Profundo/Verde Tecnológico/
+   marfim) -- tokens redeclarados aqui de propósito, não importados: cada
+   página lazy-loaded carrega só o CSS que precisa (ver comentário no topo
+   de Console.css sobre essa convenção). */
+
+.historia-shell {
+  --ink: #0b2842;
+  --ink-soft: #33506b;
+  --paper: #f7f5ef;
+  --paper-raised: #ffffff;
+  --line: #d9d3c4;
+  --accent: #05a67c;
+  --accent-soft: #e3f5ef;
+  --amber: #f2a93b;
+
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Manrope', system-ui, sans-serif;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+}
+
+.historia-shell h1,
+.historia-shell h2 {
+  font-family: 'Sora', 'Manrope', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0;
+}
+
+.historia-shell .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #05684f;
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  margin: 0 0 0.5rem;
+}
+
+.historia-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem clamp(1.25rem, 4vw, 3rem);
+  background: rgba(247, 245, 239, 0.92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--line);
+}
+.historia-header .wordmark {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--ink);
+  text-decoration: none;
+}
+.back-link {
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.back-link:hover {
+  color: var(--accent);
+}
+
+.historia-main {
+  flex: 1;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: clamp(3rem, 7vw, 5rem) clamp(1.25rem, 4vw, 3rem) 4rem;
+  width: 100%;
+}
+.historia-intro h1 {
+  font-size: clamp(1.9rem, 5vw, 2.6rem);
+  text-wrap: balance;
+}
+.historia-lead {
+  margin-top: 1rem;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  max-width: 34rem;
+}
+
+.entry-timeline {
+  list-style: none;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 1.25rem;
+  /* Linha vertical de "trilha" conectando as entradas -- mesmo princípio
+     visual de .mini-rail/.legacy-list em Home.css, só que na vertical. */
+  border-left: 2px solid var(--line);
+  padding-left: 1.5rem;
+}
+.entry-card {
+  position: relative;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1.5rem 1.75rem;
+}
+.entry-card::before {
+  content: '';
+  position: absolute;
+  left: -1.86rem;
+  top: 1.9rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--paper);
+}
+.entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+.entry-date {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.entry-status {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+}
+.entry-status-upcoming {
+  color: #8a5a00;
+  background: #fdf3e3;
+}
+.entry-card h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+}
+.entry-card p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.historia-footer {
+  background: var(--ink);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 2.5rem clamp(1.25rem, 4vw, 3rem);
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  text-align: center;
+  font-size: 0.85rem;
+}
+.historia-footer .footer-brand {
+  font-family: 'Sora', sans-serif;
+  font-weight: 800;
+  color: #fff;
+  font-size: 1.1rem;
+}
+.historia-footer a {
+  color: var(--accent);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}

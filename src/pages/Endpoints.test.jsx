@@ -11,16 +11,25 @@ afterEach(() => {
 
 function makeApiFetch({
   endpoints = [],
+  // GET /api/endpoints devolve isso em vez de `endpoints` depois que o
+  // mock de /assess já foi chamado uma vez -- simula o backend
+  // persistindo o resumo e o refetch (handleSubmitAssess's
+  // loadEndpoints()) trazendo esse novo estado, sem reload manual.
+  endpointsAfterAssess = null,
   bulkResult = [],
   results = [],
   checkResult = {},
   findings = [],
+  // {status: 'error', httpStatus, message} para simular uma tentativa de
+  // avaliação que falha (nunca deve apagar um resumo anterior válido).
+  assessResult = null,
   previewResult = null,
   publishResult = null,
 } = {}) {
+  let assessed = false
   return vi.fn(async (path, options = {}) => {
     if (path === '/api/endpoints' && (!options.method || options.method === 'GET')) {
-      return { ok: true, json: async () => endpoints }
+      return { ok: true, json: async () => (assessed && endpointsAfterAssess ? endpointsAfterAssess : endpoints) }
     }
     if (path === '/api/endpoints/bulk') {
       return { ok: true, json: async () => bulkResult }
@@ -35,6 +44,14 @@ function makeApiFetch({
       }
     }
     if (/\/api\/endpoints\/\d+\/assess$/.test(path)) {
+      assessed = true
+      if (assessResult?.status === 'error') {
+        return {
+          ok: false,
+          status: assessResult.httpStatus ?? 401,
+          json: async () => ({ detail: assessResult.message ?? 'assess failed' }),
+        }
+      }
       return { ok: true, json: async () => findings }
     }
     if (path === '/api/demo-host-snapshot/preview') {
@@ -78,6 +95,14 @@ async function renderEndpoints(options) {
   const apiFetch = makeApiFetch(options)
   render(<Endpoints apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
   await waitFor(() => screen.getByText('Importar CSV'))
+  // "Importar CSV" é estático, sempre presente desde o primeiro render --
+  // não prova que o GET /api/endpoints mockado já resolveu. Sem esperar
+  // "Carregando…" sumir, qualquer asserção/clique logo em seguida que
+  // dependa da lista carregada (contagens, botões por endpoint) corre
+  // contra um estado ainda vazio de forma intermitente (achado real: uma
+  // fração real das execuções falhava antes deste fix, tanto local
+  // quanto em CI).
+  await waitFor(() => expect(screen.queryByText('Carregando…')).toBeNull())
   return apiFetch
 }
 
@@ -245,7 +270,13 @@ describe('Endpoints -- separação visual Ambiente demonstrativo/operacional', (
     ]
     await renderEndpoints({ endpoints })
 
-    screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') })
+    // renderEndpoints só espera o formulário estático ("Importar CSV")
+    // aparecer -- a lista em si (e as seções que dependem dela) só existe
+    // depois que o GET /api/endpoints mockado resolve, que é um passo
+    // async separado. Sem esse waitFor, a asserção corre contra um
+    // estado ainda "Carregando…" de forma intermitente (achado real:
+    // ~30-40% de falha em execução repetida antes deste fix).
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') }))
     screen.getByRole('heading', { name: headingMatcher('Ambiente operacional (1)') })
     screen.getByText('10.89.77.11')
     screen.getByText('10.0.0.5')
@@ -255,7 +286,7 @@ describe('Endpoints -- separação visual Ambiente demonstrativo/operacional', (
     const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
     await renderEndpoints({ endpoints })
 
-    screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') })
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') }))
     expect(screen.queryByText(/Ambiente operacional/)).toBeNull()
   })
 })
@@ -484,5 +515,84 @@ describe('Endpoints -- painel admin de publicação da demo', () => {
     await waitFor(() => screen.getByText(/Demo despublicada/))
 
     expect(screen.queryByText('HTTP 413')).toBeNull()
+  })
+})
+
+describe('Endpoints -- resumo persistido da última avaliação', () => {
+  it('endpoint nunca avaliado não mostra "Última avaliação"', async () => {
+    const endpoints = [{ id: 1, address: '10.0.0.5', label: null, tags: [], classification: 'linux', confidence: 1 }]
+    await renderEndpoints({ endpoints })
+
+    expect(screen.queryByText(/Última avaliação/)).toBeNull()
+  })
+
+  it('depois de avaliar com sucesso, mostra o resumo vindo do servidor (refetch, nunca reconstruído localmente)', async () => {
+    const endpoints = [{ id: 1, address: '10.0.0.5', label: null, tags: [], classification: 'linux', confidence: 1 }]
+    const endpointsAfterAssess = [
+      {
+        ...endpoints[0],
+        last_assessed_at: '2026-09-23T20:34:00Z',
+        last_assessment_target_type: 'linux_host',
+        last_assessment_pass_count: 112,
+        last_assessment_fail_count: 70,
+        last_assessment_not_applicable_count: 10,
+        last_assessment_not_assessed_count: 7,
+        last_assessment_compliance_pct: 62,
+      },
+    ]
+    const apiFetch = await renderAssessedEndpoint({ endpoints, endpointsAfterAssess })
+
+    // apiFetch chamado com GET /api/endpoints de novo (mount + depois do assess).
+    const getEndpointsCalls = apiFetch.mock.calls.filter(
+      ([path, options]) => path === '/api/endpoints' && (!options?.method || options.method === 'GET'),
+    )
+    expect(getEndpointsCalls.length).toBeGreaterThanOrEqual(2)
+
+    screen.getByText(/Última avaliação/)
+    screen.getByText(/112 PASS/)
+    screen.getByText(/70 FAIL/)
+    screen.getByText(/10 N\/A/)
+    screen.getByText(/7 não avaliados/)
+    screen.getByText(/compliance 62%/)
+  })
+
+  it('uma avaliação que falha mostra "Última tentativa" sem apagar uma "Última avaliação" anterior', async () => {
+    const endpoints = [
+      {
+        id: 1,
+        address: '10.0.0.5',
+        label: null,
+        tags: [],
+        classification: 'linux',
+        confidence: 1,
+        last_assessed_at: '2026-09-23T20:34:00Z',
+        last_assessment_target_type: 'linux_host',
+        last_assessment_pass_count: 112,
+        last_assessment_fail_count: 87,
+        last_assessment_not_applicable_count: 0,
+        last_assessment_not_assessed_count: 0,
+        last_assessment_compliance_pct: 56,
+      },
+    ]
+    const apiFetch = await renderEndpoints({
+      endpoints,
+      assessResult: { status: 'error', httpStatus: 401, message: 'bad SSH credentials' },
+    })
+
+    fireEvent.click(screen.getByText('Executar avaliação →'))
+    await waitFor(() => screen.getByLabelText('Usuário'))
+    fireEvent.change(screen.getByLabelText('Usuário'), { target: { value: 'demo-lab' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Senha' }))
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'wrong' } })
+    fireEvent.click(screen.getByText('Executar avaliação'))
+
+    await waitFor(() => screen.getByText(/bad SSH credentials/))
+    fireEvent.click(screen.getByText('← Voltar'))
+
+    screen.getByText(/Última tentativa: falhou/)
+    // A avaliação válida anterior continua visível, intocada.
+    screen.getByText(/Última avaliação/)
+    screen.getByText(/112 PASS/)
+    expect(apiFetch.mock.calls.some(([path]) => /\/api\/endpoints\/\d+\/assess$/.test(path))).toBe(true)
   })
 })

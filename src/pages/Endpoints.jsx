@@ -45,7 +45,7 @@ function ClassificationBadge({ classification, confidence }) {
   )
 }
 
-function EndpointCard({ endpoint, checkResult, discovering, onDiscover, onDelete, onViewResults, onRunAssessment }) {
+function EndpointCard({ endpoint, checkResult, discovering, lastFailedAttempt, onDiscover, onDelete, onViewResults, onRunAssessment }) {
   const targetLabel = checkResult?.testable
     ? formatTargetLabel('linux_host', formatOsDisplayFromParts(checkResult.os_id, checkResult.os_version_id), {
         primaryIp: checkResult.primary_ip,
@@ -59,6 +59,30 @@ function EndpointCard({ endpoint, checkResult, discovering, onDiscover, onDelete
       <div style={{ marginBottom: '0.75rem' }}>
         <ClassificationBadge classification={endpoint.classification} confidence={endpoint.confidence} />
       </div>
+      {/* Vem só de GET /endpoints (endpoint.last_assessed_at etc.) --
+          nunca reconstruído a partir de findings em memória, que nem
+          sobrevivem a um reload. Findings completos continuam efêmeros
+          de propósito -- só este resumo leve é persistido. */}
+      {endpoint.last_assessed_at && (
+        <div className="hint" style={{ marginBottom: '0.5rem' }}>
+          Última avaliação: {new Date(endpoint.last_assessed_at).toLocaleString()}
+          {' — '}
+          {endpoint.last_assessment_pass_count} PASS · {endpoint.last_assessment_fail_count} FAIL
+          {' · '}
+          {endpoint.last_assessment_not_applicable_count} N/A
+          {' · '}
+          {endpoint.last_assessment_not_assessed_count} não avaliados
+          {endpoint.last_assessment_compliance_pct != null && ` · compliance ${endpoint.last_assessment_compliance_pct}%`}
+        </div>
+      )}
+      {/* Só de sessão, nunca persistido (decisão explícita de não
+          guardar histórico de tentativas com erro) -- não apaga a
+          "Última avaliação" válida acima, as duas podem aparecer juntas. */}
+      {lastFailedAttempt && (
+        <div className="hint error" style={{ marginBottom: '0.5rem' }}>
+          Última tentativa: falhou às {lastFailedAttempt.toLocaleTimeString()}
+        </div>
+      )}
       {endpoint.tags?.length > 0 && (
         <div className="card__row">
           <span>Tags</span>
@@ -304,7 +328,7 @@ function ImportSummary({ results, onDismiss }) {
 // Descobrir/Check/avaliação são idênticos nos dois ambientes -- só
 // "Publicar como demo" trata os dois de forma diferente (ver
 // assessedEndpoints em AdminEndpoints).
-function EndpointSection({ heading, groupEndpoints, checkResults, discoveringId, onDiscover, onDelete, onViewResults, onRunAssessment }) {
+function EndpointSection({ heading, groupEndpoints, checkResults, lastFailedAttempts, discoveringId, onDiscover, onDelete, onViewResults, onRunAssessment }) {
   if (groupEndpoints.length === 0) return null
 
   return (
@@ -325,6 +349,7 @@ function EndpointSection({ heading, groupEndpoints, checkResults, discoveringId,
               endpoint={endpoint}
               checkResult={checkResults[endpoint.id]}
               discovering={discoveringId === endpoint.id}
+              lastFailedAttempt={lastFailedAttempts[endpoint.id]}
               onDiscover={onDiscover}
               onDelete={onDelete}
               onViewResults={onViewResults}
@@ -382,6 +407,12 @@ function AdminEndpoints({ apiFetch, username, onLogout }) {
   // this, since assess results previously only ever lived transiently in
   // `detail`).
   const [assessResults, setAssessResults] = useState({})
+  // endpoint id -> Date da última tentativa de avaliação que falhou --
+  // só de sessão, nunca persistido nem enviado ao backend (decisão
+  // explícita de não guardar histórico de tentativas com erro). Nunca
+  // apaga endpoint.last_assessed_at (que vem só do servidor) -- as duas
+  // indicações podem aparecer juntas no card.
+  const [lastFailedAttempts, setLastFailedAttempts] = useState({})
   // idle | previewing | preview-ready | publishing | published | error
   const [publishState, setPublishState] = useState('idle')
   const [publishPreview, setPublishPreview] = useState(null)
@@ -569,6 +600,12 @@ function AdminEndpoints({ apiFetch, username, onLogout }) {
       }
       const findings = await response.json()
       setAssessResults((prev) => ({ ...prev, [endpoint.id]: findings }))
+      // Refetch completo (mesmo padrão de handleDiscover) -- é assim que
+      // o card volta a mostrar endpoint.last_assessed_at/contagens PASS/
+      // FAIL/N/A vindas do resumo que o backend acabou de persistir.
+      // Nunca reconstruído a partir de `findings` aqui (evitaria
+      // duplicar a lógica de split_findings/compliance_pct em JS).
+      await loadEndpoints()
       // primary_ip is always the endpoint's own stored address (known
       // regardless of whether Check ran first); hostname only exists if
       // Check was run in this same form session -- never invented otherwise.
@@ -581,6 +618,7 @@ function AdminEndpoints({ apiFetch, username, onLogout }) {
       })
     } catch (err) {
       setError(err.message)
+      setLastFailedAttempts((prev) => ({ ...prev, [endpoint.id]: new Date() }))
       // stays on 'assess-form' so port/username don't need to be retyped
     } finally {
       setAssessKeyMaterial('')
@@ -856,6 +894,7 @@ function AdminEndpoints({ apiFetch, username, onLogout }) {
             heading="Ambiente demonstrativo"
             groupEndpoints={endpoints.filter((e) => e.is_demo)}
             checkResults={checkResults}
+            lastFailedAttempts={lastFailedAttempts}
             discoveringId={discoveringId}
             onDiscover={handleDiscover}
             onDelete={handleDelete}
@@ -866,6 +905,7 @@ function AdminEndpoints({ apiFetch, username, onLogout }) {
             heading="Ambiente operacional"
             groupEndpoints={endpoints.filter((e) => !e.is_demo)}
             checkResults={checkResults}
+            lastFailedAttempts={lastFailedAttempts}
             discoveringId={discoveringId}
             onDiscover={handleDiscover}
             onDelete={handleDelete}
