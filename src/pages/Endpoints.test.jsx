@@ -95,6 +95,14 @@ async function renderEndpoints(options) {
   const apiFetch = makeApiFetch(options)
   render(<Endpoints apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
   await waitFor(() => screen.getByText('Importar CSV'))
+  // "Importar CSV" é estático, sempre presente desde o primeiro render --
+  // não prova que o GET /api/endpoints mockado já resolveu. Sem esperar
+  // "Carregando…" sumir, qualquer asserção/clique logo em seguida que
+  // dependa da lista carregada (contagens, botões por endpoint) corre
+  // contra um estado ainda vazio de forma intermitente (achado real: uma
+  // fração real das execuções falhava antes deste fix, tanto local
+  // quanto em CI).
+  await waitFor(() => expect(screen.queryByText('Carregando…')).toBeNull())
   return apiFetch
 }
 
@@ -262,7 +270,13 @@ describe('Endpoints -- separação visual Ambiente demonstrativo/operacional', (
     ]
     await renderEndpoints({ endpoints })
 
-    screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') })
+    // renderEndpoints só espera o formulário estático ("Importar CSV")
+    // aparecer -- a lista em si (e as seções que dependem dela) só existe
+    // depois que o GET /api/endpoints mockado resolve, que é um passo
+    // async separado. Sem esse waitFor, a asserção corre contra um
+    // estado ainda "Carregando…" de forma intermitente (achado real:
+    // ~30-40% de falha em execução repetida antes deste fix).
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') }))
     screen.getByRole('heading', { name: headingMatcher('Ambiente operacional (1)') })
     screen.getByText('10.89.77.11')
     screen.getByText('10.0.0.5')
@@ -272,7 +286,7 @@ describe('Endpoints -- separação visual Ambiente demonstrativo/operacional', (
     const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
     await renderEndpoints({ endpoints })
 
-    screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') })
+    await waitFor(() => screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') }))
     expect(screen.queryByText(/Ambiente operacional/)).toBeNull()
   })
 })
