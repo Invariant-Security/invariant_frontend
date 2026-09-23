@@ -6,6 +6,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 // route, so whichever loaded last would win everywhere.
 const Demo = lazy(() => import('./pages/Demo.jsx'))
 const Home = lazy(() => import('./pages/Home.jsx'))
+const Historia = lazy(() => import('./pages/Historia.jsx'))
 const Setup = lazy(() => import('./pages/Setup.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Endpoints = lazy(() => import('./pages/Endpoints.jsx'))
@@ -93,7 +94,8 @@ export default function App() {
 
   return (
     <Suspense fallback={null}>
-      {!isConsoleRoute && (path === '/demo' ? <Demo /> : <Home />)}
+      {!isConsoleRoute &&
+        (path === '/demo' ? <Demo /> : path === '/nossa-historia' ? <Historia /> : <Home />)}
 
       {isEndpointsRoute && showAuthScreen && authGate?.mode === 'setup' && (
         <Setup apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />

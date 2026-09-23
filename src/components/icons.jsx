@@ -95,6 +95,53 @@ export function Layers3(props) {
   )
 }
 
+export function Lock(props) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V7a4 4 0 018 0v4" />
+    </Icon>
+  )
+}
+
+export function Eye(props) {
+  return (
+    <Icon {...props}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </Icon>
+  )
+}
+
+export function ShieldCheck(props) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6l7-3z" />
+      <path d="M9 12l2 2 4-4" />
+    </Icon>
+  )
+}
+
+export function Target(props) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+export function Terminal(props) {
+  return (
+    <Icon {...props}>
+      <path d="M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z" />
+      <path d="M7 9l3 3-3 3" />
+      <path d="M13 15h4" />
+    </Icon>
+  )
+}
+
 export function Menu(props) {
   return (
     <Icon {...props}>

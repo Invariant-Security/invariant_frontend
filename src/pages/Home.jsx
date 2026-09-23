@@ -5,11 +5,16 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleAlert,
+  Eye,
   ExternalLink,
   FileCheck2,
   Layers3,
+  Lock,
   Menu,
   ScanSearch,
+  ShieldCheck,
+  Target,
+  Terminal,
   X,
 } from '../components/icons.jsx'
 import { useDocumentLang } from '../hooks/useDocumentLang.js'
@@ -296,7 +301,9 @@ export default function Home() {
         <nav className="desktop-nav" aria-label="Navegação principal">
           <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
           <button onClick={() => scrollTo('mercado')}>Mercado</button>
+          <button onClick={() => scrollTo('seguranca')}>Segurança</button>
           <button onClick={() => scrollTo('planos')}>Falar com a gente</button>
+          <a href="/nossa-historia">Nossa história</a>
           <a href="/containers">Explorar demo</a>
         </nav>
 
@@ -307,7 +314,9 @@ export default function Home() {
           <div className="mobile-nav">
             <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
             <button onClick={() => scrollTo('mercado')}>Mercado</button>
+            <button onClick={() => scrollTo('seguranca')}>Segurança</button>
             <button onClick={() => scrollTo('planos')}>Falar com a gente</button>
+            <a href="/nossa-historia">Nossa história</a>
             <a href="/containers">Explorar demo</a>
           </div>
         )}
@@ -325,8 +334,9 @@ export default function Home() {
               O que não se consegue <em>explicar</em>, não se consegue defender.
             </h1>
             <p className="hero-lead">
-              A Invariant transforma configuração de infraestrutura crítica em evidência auditável — pra ambientes
-              híbridos e legados que não podem parar.
+              Sem agentes pesados, sem senha ou chave SSH guardada no banco: a Invariant avalia hosts Linux e
+              containers Docker contra ~199 controles CIS Benchmark e devolve evidência auditável — finding,
+              controle, fonte e versão, prontos pra sustentar uma auditoria.
             </p>
             <div className="hero-actions">
               <button className="primary-action" onClick={() => scrollTo('planos')}>
@@ -384,6 +394,40 @@ export default function Home() {
                 <ChevronRight size={15} />
                 <span>evidência</span>
               </div>
+            </div>
+          </div>
+
+          {/* Passo a passo literal do que acontece numa avaliação --
+              complementa a tese acima (dor/resposta) com o "como", não
+              substitui. Reaproveita .card-label/.thesis-card em vez de
+              criar um componente novo de card. */}
+          <div className="flow-grid">
+            <div className="flow-card">
+              <div className="card-label">
+                <Target size={16} /> 1. CADASTRO DE ALVOS
+              </div>
+              <h4>IP, CIDR ou container Docker</h4>
+              <p>Sem agente instalado no destino.</p>
+            </div>
+            <div className="flow-arrow" aria-hidden="true">
+              <ChevronRight size={20} />
+            </div>
+            <div className="flow-card">
+              <div className="card-label">
+                <Terminal size={16} /> 2. VARREDURA AUTOMATIZADA
+              </div>
+              <h4>SSH (Paramiko) ou socket Docker</h4>
+              <p>Leitura apenas — ~199 verificações por CIS Benchmark.</p>
+            </div>
+            <div className="flow-arrow" aria-hidden="true">
+              <ChevronRight size={20} />
+            </div>
+            <div className="flow-card">
+              <div className="card-label">
+                <FileCheck2 size={16} /> 3. EVIDÊNCIA AUDITÁVEL
+              </div>
+              <h4>Finding → Controle → Fonte → Versão</h4>
+              <p>Exportável em PDF técnico, executivo ou consolidado.</p>
             </div>
           </div>
         </section>
@@ -484,9 +528,60 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="planos" className="content-section pricing-section">
+        <section id="seguranca" className="content-section security-section">
           <SectionHeader
             index="03"
+            eyebrow="Segurança & Privacidade"
+            title="Cético é o comportamento certo antes de conectar uma ferramenta na sua infraestrutura."
+            body="Sem meias palavras sobre como a Invariant acessa, avalia e guarda (ou não guarda) o que encontra."
+          />
+          <div className="security-grid">
+            <div className="thesis-card thesis-card-light">
+              <div className="card-label">
+                <Lock size={16} /> CREDENCIAIS
+              </div>
+              <h3>Nunca persistidas</h3>
+              <p>
+                SSH via Paramiko ou socket Docker. A credencial existe em memória só durante a avaliação — nunca é
+                gravada em disco ou banco.
+              </p>
+            </div>
+            <div className="thesis-card thesis-card-light">
+              <div className="card-label">
+                <Eye size={16} /> IMPACTO OPERACIONAL
+              </div>
+              <h3>Leitura, nunca escrita</h3>
+              <p>
+                Verificações inspecionam arquivo, permissão e configuração — nunca alteram estado, nunca reiniciam
+                serviço.
+              </p>
+            </div>
+            <div className="thesis-card thesis-card-light">
+              <div className="card-label">
+                <Layers3 size={16} /> RASTREABILIDADE
+              </div>
+              <h3>Nada sem explicação</h3>
+              <p>
+                Todo achado carrega o controle, a fonte (CIS), a versão do documento e a evidência coletada — nada
+                aparece sem dizer de onde veio.
+              </p>
+            </div>
+            <div className="thesis-card thesis-card-light">
+              <div className="card-label">
+                <ShieldCheck size={16} /> ISOLAMENTO
+              </div>
+              <h3>Uma sessão, uma ação</h3>
+              <p>
+                Cada avaliação roda contra um alvo por vez, sob sessão de administrador autenticada — nenhum alvo
+                entra na plataforma sem uma ação explícita.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="planos" className="content-section pricing-section">
+          <SectionHeader
+            index="04"
             eyebrow="Fale com a Invariant"
             title="Leve o Invariant para o seu ambiente."
             body="Conte um pouco sobre a sua operação. Nós avaliamos o cenário e entramos em contato para mostrar como o Invariant pode ser aplicado ao seu ambiente."
@@ -520,7 +615,9 @@ export default function Home() {
 
       <footer className="site-footer">
         <div className="footer-brand">Invariant</div>
-        <p>© 2026 Invariant Security. <a href="/containers">Explorar demo</a></p>
+        <p>
+          © 2026 Invariant Security. <a href="/containers">Explorar demo</a> · <a href="/nossa-historia">Nossa história</a>
+        </p>
         <a href="https://github.com/Invariant-Security/Invariant" target="_blank" rel="noreferrer">
           Repositório público <ExternalLink size={14} />
         </a>
