@@ -34,8 +34,9 @@ export default function Privacidade() {
         <section>
           <h2>1. Controlador</h2>
           <p>
-            Esta política é mantida pela <Pending>Invariant Security [razão social, CNPJ e endereço a confirmar]</Pending>,
-            responsável pelo tratamento dos dados pessoais descritos aqui.
+            Esta política é mantida pela Invariant Security, responsável pelo tratamento dos dados pessoais
+            descritos aqui. <Pending>Razão social e endereço formais: a confirmar quando a empresa estiver
+            formalmente constituída.</Pending>
           </p>
         </section>
 
@@ -167,7 +168,7 @@ export default function Privacidade() {
         <section>
           <h2>12. Como exercer seus direitos</h2>
           <p>
-            Envie sua solicitação para <Pending>[e-mail de contato de privacidade a confirmar]</Pending>. Vamos
+            Envie sua solicitação para <a href="mailto:victor@invariantsec.org">victor@invariantsec.org</a>. Vamos
             responder dentro de um prazo razoável.
           </p>
         </section>
