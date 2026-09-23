@@ -68,7 +68,6 @@ function LeadForm() {
   const [environmentSize, setEnvironmentSize] = useState('')
   const [primaryNeed, setPrimaryNeed] = useState('')
   const [message, setMessage] = useState('')
-  const [consent, setConsent] = useState(false)
   const [website, setWebsite] = useState('') // honeypot -- humano nunca preenche
   const [state, setState] = useState('idle') // idle | loading | success | error
   // Fade sequencial pedido: o form desaparece (200ms) ANTES da confirmação
@@ -201,14 +200,14 @@ function LeadForm() {
         aria-hidden="true"
       />
 
-      <p className="lead-form-privacy">Usaremos seus dados para responder ao seu contato comercial.</p>
-
-      <label className="lead-consent">
-        <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} required />
-        {/* Pendência: ainda não existe página de Política de Privacidade
-            publicada no site -- linkar aqui assim que ela existir. */}
-        <span>Concordo com o uso dos meus dados para este contato comercial.</span>
-      </label>
+      {/* Aviso de transparência, não um contrato de consentimento -- o
+          atendimento de uma solicitação comercial não depende de
+          consentimento como base legal (ver Política de Privacidade),
+          então não há checkbox obrigatório de "li e aceito" aqui. */}
+      <p className="lead-form-privacy">
+        Usaremos seus dados para responder à sua solicitação e entrar em contato sobre a Invariant. Saiba como
+        tratamos seus dados na <a href="/privacidade">Política de Privacidade</a>.
+      </p>
 
       <button type="submit" className="primary-action" disabled={state === 'loading'}>
         {state === 'loading' ? 'Enviando...' : 'Falar com a Invariant'}
@@ -627,6 +626,9 @@ export default function Home() {
         <div className="footer-brand">Invariant</div>
         <p>
           © 2026 Invariant Security. <a href="/containers">Explorar demo</a> · <a href="/nossa-historia">Nossa história</a>
+        </p>
+        <p className="footer-legal-links">
+          <a href="/privacidade">Privacidade</a> · <a href="/termos">Termos de Uso</a> · <a href="/cookies">Cookies</a>
         </p>
         <a href="https://github.com/Invariant-Security/Invariant" target="_blank" rel="noreferrer">
           Repositório público <ExternalLink size={14} />

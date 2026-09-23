@@ -32,7 +32,6 @@ function fillRequiredFields() {
   fireEvent.change(screen.getByLabelText(/E-mail corporativo\*/), { target: { value: 'ana@example.com' } })
   fireEvent.change(screen.getByLabelText(/Empresa\*/), { target: { value: 'Exemplo LTDA' } })
   fireEvent.change(screen.getByLabelText(/Interesse\*/), { target: { value: 'linux' } })
-  fireEvent.click(screen.getByLabelText(/Concordo com o uso dos meus dados/))
 }
 
 function makeFetch(impl) {
@@ -52,21 +51,22 @@ describe('Home -- formulário "Fale com a Invariant"', () => {
     screen.getByLabelText(/Interesse\*/)
     screen.getByLabelText('Principal necessidade')
     screen.getByLabelText('Mensagem')
-    screen.getByLabelText(/Concordo com o uso dos meus dados/)
     screen.getByText('Falar com a Invariant')
     screen.getByText('Implantação on-premises · Licença anual · Atualizações e suporte incluídos.')
   })
 
-  it('marca nome/e-mail/empresa/interesse/consentimento como obrigatórios', () => {
+  it('marca nome/e-mail/empresa/interesse como obrigatórios, sem checkbox de consentimento', () => {
     render(<Home />)
 
     expect(screen.getByLabelText(/Nome\*/).required).toBe(true)
     expect(screen.getByLabelText(/E-mail corporativo\*/).required).toBe(true)
     expect(screen.getByLabelText(/Empresa\*/).required).toBe(true)
     expect(screen.getByLabelText(/Interesse\*/).required).toBe(true)
-    expect(screen.getByLabelText(/Concordo com o uso dos meus dados/).required).toBe(true)
     expect(screen.getByLabelText('Cargo').required).toBe(false)
     expect(screen.getByLabelText('Mensagem').required).toBe(false)
+    // Aviso de transparência, não um contrato de consentimento -- não há
+    // checkbox obrigatório de "li e aceito" neste formulário.
+    expect(screen.queryByRole('checkbox')).toBeNull()
   })
 
   it('esconde "Quantos ambientes Linux" até o interesse incluir Linux', () => {
@@ -84,11 +84,11 @@ describe('Home -- formulário "Fale com a Invariant"', () => {
     screen.getByLabelText('Quantos ambientes Linux')
   })
 
-  it('mostra o aviso de privacidade, sem link', () => {
+  it('mostra o aviso de privacidade com link pra /privacidade', () => {
     render(<Home />)
 
-    const notice = screen.getByText('Usaremos seus dados para responder ao seu contato comercial.')
-    expect(notice.querySelector('a')).toBeNull()
+    const link = screen.getByRole('link', { name: 'Política de Privacidade' })
+    expect(link.getAttribute('href')).toBe('/privacidade')
   })
 
   it('mostra "Enviando..." e desabilita o botão durante o envio', async () => {
