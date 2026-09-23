@@ -342,9 +342,20 @@ export default function Home() {
                 Falar com a gente <ArrowDownRight size={18} />
               </button>
               <a className="secondary-action" href="/containers">
-                Explorar demo <ExternalLink size={16} />
+                Acessar Demo Lab (sem cadastro) <ExternalLink size={16} />
               </a>
             </div>
+            {/* CTA terciário, mais leve -- link direto pro PDF de um snapshot
+                que já está publicado de verdade em produção (verificado antes
+                de escrever isso), não um exemplo fabricado. */}
+            <a
+              className="hero-tertiary-action"
+              href={`${API_BASE}/demo-snapshot/report?kind=consolidated`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <FileCheck2 size={15} /> Baixar relatório de exemplo (PDF)
+            </a>
           </div>
           <div className="hero-evidence">
             <span className="evidence-label">EVIDÊNCIA PRINCIPAL</span>
@@ -440,13 +451,13 @@ export default function Home() {
             <div>
               <span>01</span>
               <p>
-                <strong>CIS + Linux</strong> em demo pública de assessment.
+                <strong>~199 checks</strong> por rodada, alinhados ao CIS Benchmark.
               </p>
             </div>
             <div>
               <span>02</span>
               <p>
-                <strong>Rastreabilidade</strong> entre finding, controle, fonte e versão.
+                <strong>Zero agentes</strong> instalados no alvo — SSH ou socket Docker.
               </p>
             </div>
             <div>
@@ -539,27 +550,27 @@ export default function Home() {
               <div className="card-label">
                 <Lock size={16} /> CREDENCIAIS
               </div>
-              <h3>Nunca persistidas</h3>
+              <h3>Onde ficam minhas credenciais de acesso?</h3>
               <p>
-                SSH via Paramiko ou socket Docker. A credencial existe em memória só durante a avaliação — nunca é
-                gravada em disco ou banco.
+                Em lugar nenhum permanente. SSH via Paramiko ou socket Docker — a credencial existe em memória só
+                durante a avaliação e é descartada logo em seguida, nunca gravada em disco ou banco.
               </p>
             </div>
             <div className="thesis-card thesis-card-light">
               <div className="card-label">
                 <Eye size={16} /> IMPACTO OPERACIONAL
               </div>
-              <h3>Leitura, nunca escrita</h3>
+              <h3>Isso vai afetar minha aplicação em produção?</h3>
               <p>
-                Verificações inspecionam arquivo, permissão e configuração — nunca alteram estado, nunca reiniciam
-                serviço.
+                As verificações inspecionam arquivo, permissão e configuração — leitura, não escrita. Nenhum check
+                altera estado ou reinicia serviço.
               </p>
             </div>
             <div className="thesis-card thesis-card-light">
               <div className="card-label">
                 <Layers3 size={16} /> RASTREABILIDADE
               </div>
-              <h3>Nada sem explicação</h3>
+              <h3>Como provo pro auditor que essa evidência é real?</h3>
               <p>
                 Todo achado carrega o controle, a fonte (CIS), a versão do documento e a evidência coletada — nada
                 aparece sem dizer de onde veio.
@@ -569,10 +580,10 @@ export default function Home() {
               <div className="card-label">
                 <ShieldCheck size={16} /> ISOLAMENTO
               </div>
-              <h3>Uma sessão, uma ação</h3>
+              <h3>Um alvo pode entrar na avaliação sem eu saber?</h3>
               <p>
-                Cada avaliação roda contra um alvo por vez, sob sessão de administrador autenticada — nenhum alvo
-                entra na plataforma sem uma ação explícita.
+                Não. Cada avaliação roda contra um alvo por vez, sob sessão de administrador autenticada — sempre
+                uma ação explícita, nunca automática.
               </p>
             </div>
           </div>
