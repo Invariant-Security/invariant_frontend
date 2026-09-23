@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './Home.jsx'
@@ -115,11 +115,17 @@ describe('Home -- formulário "Fale com a Invariant"', () => {
 
     fireEvent.click(screen.getByText('Falar com a Invariant'))
 
-    await waitFor(() =>
-      screen.getByText(
-        'Recebemos seus dados. Nosso time entrará em contato para entender seu ambiente e apresentar o Invariant.',
-      ),
-    )
+    // O form some (fade-out, ~200ms) antes da confirmação ser montada --
+    // ver LeadForm's useEffect/isLeaving em Home.jsx -- por isso o
+    // waitFor aqui cobre esse atraso real, não é só uma troca instantânea.
+    await waitFor(() => screen.getByText('Recebemos seus dados.'))
+    screen.getByText('Nosso time entrará em contato para entender seu ambiente e apresentar o Invariant.')
+    // "Explorar demo" já aparece em outros lugares da página (hero, nav,
+    // rodapé) -- o card de sucesso soma sua própria ocorrência, então o
+    // jeito certo de checar é dentro do próprio card, não contar o total
+    // de matches na página inteira.
+    const successCard = document.querySelector('.lead-success')
+    within(successCard).getByText('Explorar demo', { exact: false })
     expect(screen.queryByLabelText(/Nome\*/)).toBeNull()
   })
 

@@ -6,6 +6,12 @@ import { formatOsDisplayFromParts, formatTargetLabel } from '../targetLabel.js'
 import './Console.css'
 import './Findings.css'
 
+// Overridable via VITE_API_BASE, same convention as Home.jsx/Demo.jsx --
+// VisitorEndpoints usa isso pra montar link direto pro GET público
+// /demo-host-snapshot/report (fora do apiFetch normal, porque é um link
+// de navegador que abre o PDF, não uma chamada fetch).
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000'
+
 // Import de CSV: sem lib nova de propósito (a direção futura é evoluir
 // isso pra algo com IA, onde qualquer formato acaba virando texto antes de
 // ser interpretado -- não vale investir agora num parser binário de
@@ -14,6 +20,10 @@ import './Findings.css'
 // (e abuso acidental na demo) -- espelham MAX_BULK_ENDPOINTS do backend.
 const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024
 const MAX_IMPORT_ROWS = 500
+// A consolidated report compares prevalence/compliance across a fleet --
+// with a single asset there's nothing to compare, so VisitorEndpoints'
+// export button stays hidden below this count even after a demo publish.
+const MIN_CONSOLIDATED_TARGETS = 2
 
 // Escopo desta tela: cadastrar endpoints (IP único ou CIDR), disparar a
 // identificação de rede (windows/linux/docker/waf/firewall/vmware, via
@@ -287,7 +297,59 @@ function ImportSummary({ results, onDismiss }) {
   )
 }
 
-export default function Endpoints({ apiFetch, username, onLogout }) {
+// Um bloco de renderização por ambiente (demonstrativo/operacional) --
+// mesma lógica de "identificados sobem pro topo" que antes era calculada
+// uma vez só pra todos os endpoints, agora reaplicada a cada subconjunto
+// (endpoint.is_demo) antes de renderizar. EndpointCard e o fluxo de
+// Descobrir/Check/avaliação são idênticos nos dois ambientes -- só
+// "Publicar como demo" trata os dois de forma diferente (ver
+// assessedEndpoints em AdminEndpoints).
+function EndpointSection({ heading, groupEndpoints, checkResults, discoveringId, onDiscover, onDelete, onViewResults, onRunAssessment }) {
+  if (groupEndpoints.length === 0) return null
+
+  return (
+    <section style={{ marginTop: '2rem' }}>
+      <h3 style={{ marginBottom: '0.5rem' }}>
+        {heading} ({groupEndpoints.length})
+      </h3>
+      <div className="card-grid">
+        {[...groupEndpoints]
+          .sort((a, b) => {
+            const aIdentified = a.classification && a.classification !== 'unknown' ? 0 : 1
+            const bIdentified = b.classification && b.classification !== 'unknown' ? 0 : 1
+            return aIdentified - bIdentified
+          })
+          .map((endpoint) => (
+            <EndpointCard
+              key={endpoint.id}
+              endpoint={endpoint}
+              checkResult={checkResults[endpoint.id]}
+              discovering={discoveringId === endpoint.id}
+              onDiscover={onDiscover}
+              onDelete={onDelete}
+              onViewResults={onViewResults}
+              onRunAssessment={onRunAssessment}
+            />
+          ))}
+      </div>
+    </section>
+  )
+}
+
+// /endpoints é o outro ponto de entrada da demo pública (Home.jsx's
+// "Explorar demo", junto com /containers) -- sem sessão, App.jsx
+// renderiza <VisitorEndpoints> em vez deste componente (ver seu próprio
+// comentário mais abaixo). Isso aqui é só o console autenticado: hosts
+// reais, descoberta, checagem, assessment SSH, relatórios ao vivo, e o
+// painel de publicação da demo.
+export default function Endpoints({ apiFetch, username, onLogout, isVisitor = false, onRequestLogin }) {
+  if (isVisitor) {
+    return <VisitorEndpoints apiFetch={apiFetch} onRequestLogin={onRequestLogin} />
+  }
+  return <AdminEndpoints apiFetch={apiFetch} username={username} onLogout={onLogout} />
+}
+
+function AdminEndpoints({ apiFetch, username, onLogout }) {
   const [endpoints, setEndpoints] = useState([])
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(null)
@@ -314,6 +376,17 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
   // detail.checkResult) so a card in the list view can keep showing the
   // label after the form is closed, same idea as Containers.jsx's `compat`.
   const [checkResults, setCheckResults] = useState({})
+  // endpoint id -> last successful /assess findings -- feeds
+  // assessedEndpoints below (Containers.jsx tracks this in `compat`
+  // instead; Endpoints.jsx has no equivalent per-endpoint state before
+  // this, since assess results previously only ever lived transiently in
+  // `detail`).
+  const [assessResults, setAssessResults] = useState({})
+  // idle | previewing | preview-ready | publishing | published | error
+  const [publishState, setPublishState] = useState('idle')
+  const [publishPreview, setPublishPreview] = useState(null)
+  const [publishError, setPublishError] = useState(null)
+  const [revokeMessage, setRevokeMessage] = useState(null)
 
   async function loadEndpoints() {
     const response = await apiFetch('/api/endpoints')
@@ -495,6 +568,7 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
         throw new Error(body.detail ?? `HTTP ${response.status}`)
       }
       const findings = await response.json()
+      setAssessResults((prev) => ({ ...prev, [endpoint.id]: findings }))
       // primary_ip is always the endpoint's own stored address (known
       // regardless of whether Check ran first); hostname only exists if
       // Check was run in this same form session -- never invented otherwise.
@@ -512,6 +586,98 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
       setAssessKeyMaterial('')
       setAssessPassword('')
       setAssessing(false)
+    }
+  }
+
+  // Só hosts do Ambiente demonstrativo (endpoint.is_demo, faixa
+  // 10.89.77.0/24 do Demo Lab de hosts Linux, ver demo_lab/) com
+  // avaliação real já rodada entram no lote de publicação -- o backend já
+  // recusa qualquer outro (not_demo_endpoint_ids em
+  // routes/demo_host_snapshot.py), esse filtro aqui é só UX: evita o
+  // admin selecionar um host operacional já avaliado e tomar um 422 sem
+  // entender por quê.
+  const assessedEndpoints = endpoints.filter((e) => e.is_demo && assessResults[e.id])
+
+  function buildDemoPayload() {
+    return {
+      hosts: assessedEndpoints.map((e) => ({
+        endpoint_id: e.id,
+        findings: assessResults[e.id],
+      })),
+    }
+  }
+
+  // Só via /api/demo-host-snapshot/... aqui, nunca o path bare -- ao
+  // contrário de Containers.jsx (que reaproveita o mesmo /demo-snapshot
+  // bare pra GET público e POST admin, protegido só pela sessão dentro
+  // do FastAPI), o nginx de teste/produção só expõe location = pros dois
+  // GETs bare de host (ver demo_lab/docs/networking.md e o proxy repo) --
+  // POST preview/publish/revoke só existe atrás de /api/, que passa pela
+  // location genérica /api/ (rewrite -> backend) e por require_admin_session.
+  async function handlePreviewDemo() {
+    if (assessedEndpoints.length === 0) return
+    setPublishState('previewing')
+    setPublishError(null)
+    setRevokeMessage(null)
+    try {
+      const response = await apiFetch('/api/demo-host-snapshot/preview', {
+        method: 'POST',
+        body: JSON.stringify(buildDemoPayload()),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const body = await response.json()
+      setPublishPreview(body)
+      setPublishState('preview-ready')
+    } catch (err) {
+      setPublishError(err.message)
+      setPublishState('error')
+    }
+  }
+
+  async function handleConfirmPublish() {
+    setPublishState('publishing')
+    setPublishError(null)
+    try {
+      const response = await apiFetch('/api/demo-host-snapshot/publish', {
+        method: 'POST',
+        body: JSON.stringify(buildDemoPayload()),
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.detail?.message ?? `HTTP ${response.status}`)
+      }
+      setPublishState('published')
+      setPublishPreview(null)
+    } catch (err) {
+      setPublishError(err.message)
+      setPublishState('error')
+    }
+  }
+
+  function cancelPreview() {
+    setPublishState('idle')
+    setPublishPreview(null)
+    setPublishError(null)
+  }
+
+  async function handleRevokeDemo() {
+    setRevokeMessage(null)
+    // Limpa qualquer erro/prévia de uma tentativa de publicação anterior --
+    // sem isso, um 422 de um "Publicar como demo" anterior ficava
+    // empilhado na tela junto com a mensagem de sucesso do revoke (mesmo
+    // bug já corrigido em Containers.jsx).
+    setPublishState('idle')
+    setPublishError(null)
+    setPublishPreview(null)
+    try {
+      const response = await apiFetch('/api/demo-host-snapshot/revoke', { method: 'POST' })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const body = await response.json()
+      setRevokeMessage(
+        body.status === 'revoked' ? 'Demo despublicada -- visitantes não veem mais nenhum snapshot.' : 'Não havia demo publicada.',
+      )
+    } catch (err) {
+      setRevokeMessage(`Falha ao despublicar: ${err.message}`)
     }
   }
 
@@ -581,36 +747,131 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
 
           {importResult && <ImportSummary results={importResult} onDismiss={() => setImportResult(null)} />}
 
-          <h2>Hosts Linux ({endpoints.length})</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <h2 style={{ margin: 0 }}>Hosts Linux ({endpoints.length})</h2>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handlePreviewDemo}
+                disabled={assessedEndpoints.length === 0 || publishState === 'previewing'}
+                title={
+                  assessedEndpoints.length === 0
+                    ? 'Avalie pelo menos um host do Ambiente demonstrativo antes de publicar a demo.'
+                    : undefined
+                }
+              >
+                {publishState === 'previewing' ? 'Gerando prévia…' : 'Publicar como demo'}
+              </button>
+              <button type="button" className="btn-secondary" onClick={handleRevokeDemo}>
+                Despublicar demo
+              </button>
+            </div>
+          </div>
+
+          {revokeMessage && <p className="hint">{revokeMessage}</p>}
+
+          {publishState === 'preview-ready' && publishPreview && (
+            <div className="demo-publish-panel">
+              <p className="flow-guide__title">Prévia da demo pública</p>
+              {publishPreview.ok ? (
+                <>
+                  <ul>
+                    {publishPreview.hosts.map((h) => (
+                      <li key={h.name}>
+                        <strong className="mono">{h.name}</strong> ({h.address}) — {h.findings.length} findings
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button type="button" className="btn-primary" style={{ width: 'auto' }} onClick={handleConfirmPublish} disabled={publishState === 'publishing'}>
+                      {publishState === 'publishing' ? 'Publicando…' : 'Confirmar publicação'}
+                    </button>
+                    <button type="button" className="link-btn" onClick={cancelPreview}>
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              ) : publishPreview.redaction_issues?.length > 0 ? (
+                <>
+                  <p className="error">
+                    Não foi possível publicar a demo: a própria sanitização falhou -- um identificador real do
+                    Demo Lab sobreviveu num campo do snapshot depois da substituição pelo alias.
+                  </p>
+                  <ul>
+                    {publishPreview.redaction_issues.map((issue, i) => (
+                      <li key={`redaction-${i}`} className="hint">
+                        {issue.field} — {issue.category}
+                      </li>
+                    ))}
+                  </ul>
+                  <button type="button" className="link-btn" onClick={cancelPreview}>
+                    Fechar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="error">
+                    Não foi possível publicar a demo. Foram encontrados identificadores do ambiente real em campos do
+                    snapshot.
+                  </p>
+                  <ul>
+                    {publishPreview.issues.map((issue, i) => (
+                      <li key={`issue-${i}`} className="hint">
+                        {issue.field} — {issue.category}
+                      </li>
+                    ))}
+                    {publishPreview.unverified_endpoint_ids.map((id) => (
+                      <li key={`unverified-${id}`} className="hint">
+                        Host não confirmado no ambiente atual: {id}
+                      </li>
+                    ))}
+                    {(publishPreview.not_demo_endpoint_ids ?? []).map((id) => (
+                      <li key={`not-demo-${id}`} className="hint">
+                        Host não pertence ao Ambiente demonstrativo, não pode ser publicado: {id}
+                      </li>
+                    ))}
+                  </ul>
+                  <button type="button" className="link-btn" onClick={cancelPreview}>
+                    Fechar
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {publishState === 'published' && <p className="hint">Demo publicada com sucesso.</p>}
+          {publishState === 'error' && publishError && (
+            <p className="error" style={{ marginTop: '0.75rem' }}>
+              {publishError}
+            </p>
+          )}
+
           {!loaded && <p className="hint">Carregando…</p>}
           {loaded && endpoints.length === 0 && (
             <p className="hint">Nenhum host ainda -- adicione um acima e clique em Descobrir pra identificá-lo.</p>
           )}
-          <div className="card-grid">
-            {/* Hosts já identificados de verdade (classification real,
-                não "unknown"/vazio) sobem pro topo -- sort é estável, então
-                a ordem relativa dentro de cada grupo continua a mesma. Não
-                é um agrupamento visual novo, só uma ordenação -- refatorar
-                pra seções separadas fica pra outra rodada. */}
-            {[...endpoints]
-              .sort((a, b) => {
-                const aIdentified = a.classification && a.classification !== 'unknown' ? 0 : 1
-                const bIdentified = b.classification && b.classification !== 'unknown' ? 0 : 1
-                return aIdentified - bIdentified
-              })
-              .map((endpoint) => (
-              <EndpointCard
-                key={endpoint.id}
-                endpoint={endpoint}
-                checkResult={checkResults[endpoint.id]}
-                discovering={discoveringId === endpoint.id}
-                onDiscover={handleDiscover}
-                onDelete={handleDelete}
-                onViewResults={handleViewResults}
-                onRunAssessment={handleOpenAssessForm}
-              />
-            ))}
-          </div>
+
+          <EndpointSection
+            heading="Ambiente demonstrativo"
+            groupEndpoints={endpoints.filter((e) => e.is_demo)}
+            checkResults={checkResults}
+            discoveringId={discoveringId}
+            onDiscover={handleDiscover}
+            onDelete={handleDelete}
+            onViewResults={handleViewResults}
+            onRunAssessment={handleOpenAssessForm}
+          />
+          <EndpointSection
+            heading="Ambiente operacional"
+            groupEndpoints={endpoints.filter((e) => !e.is_demo)}
+            checkResults={checkResults}
+            discoveringId={discoveringId}
+            onDiscover={handleDiscover}
+            onDelete={handleDelete}
+            onViewResults={handleViewResults}
+            onRunAssessment={handleOpenAssessForm}
+          />
         </>
       )}
 
@@ -655,6 +916,121 @@ export default function Endpoints({ apiFetch, username, onLogout }) {
         <FindingDetail
           finding={detail.finding}
           onBack={() => setDetail({ kind: 'assess-result', endpoint: detail.endpoint, findings: detail.findings })}
+        />
+      )}
+    </div>
+  )
+}
+
+// Sem sessão, /endpoints vira a vitrine pública do LXD Linux Demo Lab
+// (Home.jsx's "Explorar demo") -- lê só GET /demo-host-snapshot (público,
+// já sanitizado pelo backend) e GET /demo-host-snapshot/report (também
+// público, PDF gerado a partir do snapshot ativo). Nunca chama
+// /api/endpoints, /api/endpoints/{id}/assess nem /api/reports/pdf --
+// essas exigem sessão agora, de propósito (routes/endpoints.py,
+// routes/reports.py). Sem formulário de credenciais, sem
+// Descobrir/Check/avaliação -- só leitura do que o admin já publicou.
+function VisitorEndpoints({ apiFetch, onRequestLogin }) {
+  const [hosts, setHosts] = useState([])
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState(null)
+  // null = lista de hosts. Otherwise:
+  //   {kind:'assess-result', host, findings}
+  //   {kind:'finding-detail', host, findings, finding}
+  const [detail, setDetail] = useState(null)
+
+  useEffect(() => {
+    apiFetch('/demo-host-snapshot')
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.json()
+      })
+      .then((body) => setHosts(body.hosts))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoaded(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function openReportUrl(kind, target) {
+    const params = new URLSearchParams({ kind })
+    if (target) params.set('target', target)
+    window.open(`${API_BASE}/demo-host-snapshot/report?${params.toString()}`, '_blank', 'noopener')
+  }
+
+  return (
+    <div className="page">
+      <header className="site-header">
+        <div className="brand">INVARIANT</div>
+        <div className="session-info">
+          <a href="/containers" className="link-btn">
+            Containers
+          </a>
+          <button type="button" className="btn-secondary" onClick={onRequestLogin}>
+            Entrar
+          </button>
+        </div>
+      </header>
+
+      <p className="demo-banner">
+        Ambiente demonstrativo — avaliações reais executadas contra sistemas preparados exclusivamente para
+        demonstração.
+      </p>
+
+      {error && (
+        <p className="error" style={{ marginBottom: '1rem' }}>
+          {error}
+        </p>
+      )}
+
+      {!detail && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <h2 style={{ margin: 0 }}>Hosts Linux ({hosts.length})</h2>
+            {hosts.length >= MIN_CONSOLIDATED_TARGETS && (
+              <button type="button" className="btn-secondary" onClick={() => openReportUrl('consolidated')}>
+                Ver relatório consolidado
+              </button>
+            )}
+          </div>
+
+          {!loaded && <p className="hint">Carregando…</p>}
+          {loaded && hosts.length === 0 && <p className="hint">Nenhuma demo publicada no momento.</p>}
+
+          <div className="card-grid" style={{ marginTop: '1rem' }}>
+            {hosts.map((host) => (
+              <div key={host.name} className="target-card">
+                <div className="target-card__title mono">{host.name}</div>
+                <div className="hint" style={{ marginBottom: '0.5rem' }}>{host.address}</div>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => setDetail({ kind: 'assess-result', host, findings: host.findings })}
+                >
+                  Ver relatório →
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {detail?.kind === 'assess-result' && (
+        <FindingsReport
+          title={detail.host.name}
+          findings={detail.findings}
+          hostname={detail.host.name}
+          primaryIp={detail.host.address}
+          onExportPdf={(kind) => openReportUrl(kind, detail.host.name)}
+          onSelectFinding={(finding) =>
+            setDetail({ kind: 'finding-detail', host: detail.host, findings: detail.findings, finding })
+          }
+          onBack={() => setDetail(null)}
+        />
+      )}
+      {detail?.kind === 'finding-detail' && (
+        <FindingDetail
+          finding={detail.finding}
+          onBack={() => setDetail({ kind: 'assess-result', host: detail.host, findings: detail.findings })}
         />
       )}
     </div>

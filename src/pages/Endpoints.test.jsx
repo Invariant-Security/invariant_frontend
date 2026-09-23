@@ -4,9 +4,20 @@ import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Endpoints from './Endpoints.jsx'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
-function makeApiFetch({ endpoints = [], bulkResult = [], results = [] } = {}) {
+function makeApiFetch({
+  endpoints = [],
+  bulkResult = [],
+  results = [],
+  checkResult = {},
+  findings = [],
+  previewResult = null,
+  publishResult = null,
+} = {}) {
   return vi.fn(async (path, options = {}) => {
     if (path === '/api/endpoints' && (!options.method || options.method === 'GET')) {
       return { ok: true, json: async () => endpoints }
@@ -17,8 +28,46 @@ function makeApiFetch({ endpoints = [], bulkResult = [], results = [] } = {}) {
     if (/\/api\/endpoints\/\d+\/results$/.test(path)) {
       return { ok: true, json: async () => results }
     }
+    if (/\/api\/endpoints\/\d+\/check$/.test(path)) {
+      return {
+        ok: true,
+        json: async () => ({ testable: true, os_id: 'debian', os_version_id: '12', reason: null, ...checkResult }),
+      }
+    }
+    if (/\/api\/endpoints\/\d+\/assess$/.test(path)) {
+      return { ok: true, json: async () => findings }
+    }
+    if (path === '/api/demo-host-snapshot/preview') {
+      return {
+        ok: true,
+        json: async () =>
+          previewResult ?? { ok: true, hosts: [], issues: [], unverified_endpoint_ids: [], not_demo_endpoint_ids: [], redaction_issues: [] },
+      }
+    }
+    if (path === '/api/demo-host-snapshot/publish') {
+      if (publishResult?.status === 'error') {
+        return { ok: false, status: 422, json: async () => ({ detail: { message: publishResult.message } }) }
+      }
+      return { ok: true, json: async () => ({ status: 'published' }) }
+    }
+    if (path === '/api/demo-host-snapshot/revoke') {
+      return { ok: true, json: async () => (publishResult?.revoke ?? { status: 'revoked' }) }
+    }
     return { ok: true, json: async () => ({}) }
   })
+}
+
+function makeVisitorApiFetch({ hosts = [] } = {}) {
+  return vi.fn(async (path) => {
+    if (path === '/demo-host-snapshot') {
+      return { ok: true, json: async () => ({ published_at: hosts.length ? '2026-09-20T00:00:00Z' : null, hosts }) }
+    }
+    return { ok: true, json: async () => ({}) }
+  })
+}
+
+function headingMatcher(text) {
+  return (name) => name.replace(/\s+/g, '') === text.replace(/\s+/g, '')
 }
 
 function makeCsvFile(content, name = 'hosts.csv') {
@@ -29,6 +78,22 @@ async function renderEndpoints(options) {
   const apiFetch = makeApiFetch(options)
   render(<Endpoints apiFetch={apiFetch} username="admin" onLogout={() => {}} />)
   await waitFor(() => screen.getByText('Importar CSV'))
+  return apiFetch
+}
+
+// Roda uma avaliação completa contra o único endpoint identificado
+// (classification truthy) da lista -- pré-requisito de "Executar
+// avaliação →" no card, mesma disciplina de Check/assess do console real.
+async function renderAssessedEndpoint(options) {
+  const apiFetch = await renderEndpoints(options)
+  fireEvent.click(screen.getByText('Executar avaliação →'))
+  await waitFor(() => screen.getByLabelText('Usuário'))
+  fireEvent.change(screen.getByLabelText('Usuário'), { target: { value: 'demo-lab' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Senha' }))
+  fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'x' } })
+  fireEvent.click(screen.getByText('Executar avaliação'))
+  await waitFor(() => screen.getByText('← Back'))
+  fireEvent.click(screen.getByText('← Back'))
   return apiFetch
 }
 
@@ -169,5 +234,255 @@ describe('Endpoints -- evidência real de falha de discovery', () => {
 
     await waitFor(() => screen.getByText('(nenhuma respondeu)'))
     expect(screen.queryByText('Ver detalhes')).toBeNull()
+  })
+})
+
+describe('Endpoints -- separação visual Ambiente demonstrativo/operacional', () => {
+  it('agrupa hosts demo e operacionais em seções separadas, por endpoint.is_demo', async () => {
+    const endpoints = [
+      { id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true },
+      { id: 2, address: '10.0.0.5', label: 'prod-db', tags: [], classification: 'linux', confidence: 1, is_demo: false },
+    ]
+    await renderEndpoints({ endpoints })
+
+    screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') })
+    screen.getByRole('heading', { name: headingMatcher('Ambiente operacional (1)') })
+    screen.getByText('10.89.77.11')
+    screen.getByText('10.0.0.5')
+  })
+
+  it('não mostra a seção operacional quando todo host é demo', async () => {
+    const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
+    await renderEndpoints({ endpoints })
+
+    screen.getByRole('heading', { name: headingMatcher('Ambiente demonstrativo (1)') })
+    expect(screen.queryByText(/Ambiente operacional/)).toBeNull()
+  })
+})
+
+describe('Endpoints -- modo visitante (demo pública, sem sessão)', () => {
+  it('busca /demo-host-snapshot, nunca /api/endpoints', async () => {
+    const apiFetch = makeVisitorApiFetch({
+      hosts: [{ name: 'web-prod-03.internal', address: '192.0.2.11', findings: [] }],
+    })
+    render(<Endpoints apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('web-prod-03.internal'))
+
+    expect(apiFetch.mock.calls.some(([path]) => path === '/demo-host-snapshot')).toBe(true)
+    expect(apiFetch.mock.calls.some(([path]) => path === '/api/endpoints')).toBe(false)
+  })
+
+  it('mostra o aviso de ambiente demonstrativo', async () => {
+    const apiFetch = makeVisitorApiFetch()
+    render(<Endpoints apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText(/Ambiente demonstrativo/))
+  })
+
+  it('não mostra nenhum botão de ação operacional nem formulário de credenciais', async () => {
+    const apiFetch = makeVisitorApiFetch({
+      hosts: [{ name: 'web-prod-03.internal', address: '192.0.2.11', findings: [] }],
+    })
+    render(<Endpoints apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('web-prod-03.internal'))
+
+    expect(screen.queryByText('Descobrir →')).toBeNull()
+    expect(screen.queryByText('Publicar como demo')).toBeNull()
+    expect(screen.queryByLabelText('Usuário')).toBeNull()
+    expect(screen.queryByText('Sair')).toBeNull()
+  })
+
+  it('mostra "Entrar" em vez de usuário/Sair, e aciona onRequestLogin', async () => {
+    const apiFetch = makeVisitorApiFetch()
+    const onRequestLogin = vi.fn()
+    render(<Endpoints apiFetch={apiFetch} isVisitor onRequestLogin={onRequestLogin} />)
+
+    await waitFor(() => screen.getByText('Entrar'))
+    fireEvent.click(screen.getByText('Entrar'))
+
+    expect(onRequestLogin).toHaveBeenCalled()
+  })
+
+  it('sem nenhuma demo publicada, mostra mensagem amigável', async () => {
+    const apiFetch = makeVisitorApiFetch({ hosts: [] })
+    render(<Endpoints apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('Nenhuma demo publicada no momento.'))
+  })
+
+  it('"Ver relatório →" abre os findings do snapshot sem chamar /api/endpoints/{id}/assess', async () => {
+    const findings = [
+      {
+        target: 'web-prod-03.internal',
+        external_id: '5.1.20',
+        status: 'FAIL',
+        control_title: 'Ensure sshd PermitRootLogin is disabled',
+        source_name: 'cis',
+        document_name: 'debian_linux_12',
+        document_version: '2.0.0',
+        evidence_output: 'PermitRootLogin yes',
+        level: 1,
+        scored: true,
+      },
+    ]
+    const apiFetch = makeVisitorApiFetch({
+      hosts: [{ name: 'web-prod-03.internal', address: '192.0.2.11', findings }],
+    })
+    render(<Endpoints apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('web-prod-03.internal'))
+    fireEvent.click(screen.getByText('Ver relatório →'))
+
+    await waitFor(() => screen.getByText('1 FAIL'))
+    expect(apiFetch.mock.calls.some(([path]) => /\/api\/endpoints\/\d+\/assess$/.test(path))).toBe(false)
+  })
+
+  it('mostra "Ver relatório consolidado" só com 2+ hosts, sem chamar /api/reports/pdf', async () => {
+    vi.stubGlobal('open', vi.fn())
+    const apiFetch = makeVisitorApiFetch({
+      hosts: [
+        { name: 'web-prod-03.internal', address: '192.0.2.11', findings: [] },
+        { name: 'app-prod-07.internal', address: '192.0.2.12', findings: [] },
+      ],
+    })
+    render(<Endpoints apiFetch={apiFetch} isVisitor onRequestLogin={() => {}} />)
+
+    await waitFor(() => screen.getByText('Ver relatório consolidado'))
+    fireEvent.click(screen.getByText('Ver relatório consolidado'))
+
+    expect(window.open).toHaveBeenCalledWith(
+      expect.stringContaining('/demo-host-snapshot/report?kind=consolidated'),
+      '_blank',
+      'noopener',
+    )
+    expect(apiFetch.mock.calls.some(([path]) => path === '/api/reports/pdf')).toBe(false)
+  })
+})
+
+describe('Endpoints -- painel admin de publicação da demo', () => {
+  it('"Publicar como demo" fica desabilitado sem nenhum assessment de sucesso', async () => {
+    const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
+    await renderEndpoints({ endpoints })
+
+    const publishBtn = screen.getByText('Publicar como demo')
+    expect(publishBtn.disabled).toBe(true)
+  })
+
+  it('avaliar com sucesso um host sem is_demo não habilita "Publicar como demo" (só ativos do Ambiente demonstrativo entram no lote)', async () => {
+    const endpoints = [{ id: 1, address: '10.0.0.5', label: 'prod-db', tags: [], classification: 'linux', confidence: 1, is_demo: false }]
+    await renderAssessedEndpoint({ endpoints })
+
+    const publishBtn = screen.getByText('Publicar como demo')
+    expect(publishBtn.disabled).toBe(true)
+  })
+
+  it('preview limpo mostra os hosts com alias e o botão de confirmar', async () => {
+    const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
+    const apiFetch = await renderAssessedEndpoint({ endpoints })
+    apiFetch.mockImplementation(
+      makeApiFetch({
+        endpoints,
+        previewResult: {
+          ok: true,
+          hosts: [{ name: 'web-prod-03.internal', address: '192.0.2.11', findings: [] }],
+          issues: [],
+          unverified_endpoint_ids: [],
+          not_demo_endpoint_ids: [],
+          redaction_issues: [],
+        },
+      }),
+    )
+
+    fireEvent.click(screen.getByText('Publicar como demo'))
+
+    await waitFor(() => screen.getByText('Confirmar publicação'))
+    screen.getByText(/web-prod-03.internal/)
+  })
+
+  it('preview com issues não mostra botão de confirmar', async () => {
+    const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
+    await renderAssessedEndpoint({
+      endpoints,
+      previewResult: {
+        ok: false,
+        hosts: [],
+        issues: [{ field: 'hosts[0].findings[0].evidence_output', category: 'endpoint_address' }],
+        unverified_endpoint_ids: [],
+        not_demo_endpoint_ids: [],
+        redaction_issues: [],
+      },
+    })
+
+    fireEvent.click(screen.getByText('Publicar como demo'))
+
+    await waitFor(() => screen.getByText(/identificadores do ambiente real/))
+    expect(screen.queryByText('Confirmar publicação')).toBeNull()
+    screen.getByText(/endpoint_address/)
+  })
+
+  it('preview com falha de redaction mostra mensagem distinta, sem misturar com "issues"', async () => {
+    const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
+    await renderAssessedEndpoint({
+      endpoints,
+      previewResult: {
+        ok: false,
+        hosts: [],
+        issues: [],
+        unverified_endpoint_ids: [],
+        not_demo_endpoint_ids: [],
+        redaction_issues: [{ field: 'hosts[0].findings[0].evidence_output', category: 'redaction_incomplete' }],
+      },
+    })
+
+    fireEvent.click(screen.getByText('Publicar como demo'))
+
+    await waitFor(() => screen.getByText(/a própria sanitização falhou/))
+    expect(screen.queryByText('Confirmar publicação')).toBeNull()
+    expect(screen.queryByText(/identificadores do ambiente real/)).toBeNull()
+    screen.getByText(/redaction_incomplete/)
+  })
+
+  it('manda só endpoint_id + findings no payload de publish (nunca address/label)', async () => {
+    const findings = [{ target: 'demo-host-web-01', external_id: '5.1.20', status: 'FAIL' }]
+    const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
+    const apiFetch = await renderAssessedEndpoint({ endpoints, findings })
+
+    fireEvent.click(screen.getByText('Publicar como demo'))
+
+    await waitFor(() => expect(apiFetch.mock.calls.some(([path]) => path === '/api/demo-host-snapshot/preview')).toBe(true))
+    const call = apiFetch.mock.calls.find(([path]) => path === '/api/demo-host-snapshot/preview')
+    const body = JSON.parse(call[1].body)
+    expect(body).toEqual({ hosts: [{ endpoint_id: 1, findings }] })
+  })
+
+  it('"Despublicar demo" chama /api/demo-host-snapshot/revoke e mostra confirmação', async () => {
+    const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
+    const apiFetch = await renderEndpoints({ endpoints })
+
+    fireEvent.click(screen.getByText('Despublicar demo'))
+
+    await waitFor(() => screen.getByText(/Demo despublicada/))
+    expect(apiFetch.mock.calls.some(([path, options]) => path === '/api/demo-host-snapshot/revoke' && options?.method === 'POST')).toBe(true)
+  })
+
+  it('"Despublicar demo" limpa um erro de publicação anterior, em vez de empilhar as duas mensagens', async () => {
+    const endpoints = [{ id: 1, address: '10.89.77.11', label: 'demo-host-web-01', tags: [], classification: 'linux', confidence: 1, is_demo: true }]
+    const apiFetch = await renderAssessedEndpoint({ endpoints })
+    apiFetch.mockImplementation(async (path, options = {}) => {
+      if (path === '/api/demo-host-snapshot/preview') return { ok: false, status: 413, json: async () => ({}) }
+      if (path === '/api/demo-host-snapshot/revoke') return { ok: true, json: async () => ({ status: 'revoked' }) }
+      if (path === '/api/endpoints' && (!options.method || options.method === 'GET')) return { ok: true, json: async () => endpoints }
+      return { ok: true, json: async () => ({}) }
+    })
+
+    fireEvent.click(screen.getByText('Publicar como demo'))
+    await waitFor(() => screen.getByText('HTTP 413'))
+
+    fireEvent.click(screen.getByText('Despublicar demo'))
+    await waitFor(() => screen.getByText(/Demo despublicada/))
+
+    expect(screen.queryByText('HTTP 413')).toBeNull()
   })
 })

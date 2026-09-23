@@ -292,6 +292,34 @@ h2 {
   gap: 0.9rem;
 }
 
+/* Modo visitante da demo pública (Containers.jsx's VisitorContainers) --
+   mesmo tratamento visual do .flow-guide, cor diferente (âmbar/aviso em
+   vez de neutro) pra deixar claro que o conteúdo é anonimizado, não uma
+   omissão de identidade real por acidente. */
+.demo-banner {
+  background: #fdf3e3;
+  border: 1px solid #f0d6a1;
+  border-radius: 10px;
+  padding: 0.75rem 1.25rem;
+  margin: 1rem 0 1.5rem;
+  font-size: 0.85rem;
+  color: #7a4a12;
+}
+
+.demo-publish-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+}
+.demo-publish-panel ul {
+  margin: 0.5rem 0 1rem;
+  padding-left: 1.25rem;
+  color: var(--sub);
+  font-size: 0.85rem;
+}
+
 .target-card {
   background: var(--panel);
   border: 1px solid var(--border);

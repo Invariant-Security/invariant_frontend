@@ -30,17 +30,31 @@ async function apiFetch(path, options = {}) {
 
 // No router library on purpose (matches this project's small dependency
 // footprint, see Demo.jsx's own comment) -- just path-based navigation via
-// plain <a> tags that reload the page. Within the console's 3 screens,
-// which one actually renders is decided by auth state (authGate below),
-// not by the literal pathname -- e.g. hitting /endpoints while logged out
-// shows Login in place, no client-side redirect needed.
+// plain <a> tags that reload the page. Within the console's screens, which
+// one actually renders is decided by auth state (authGate below), not by
+// the literal pathname -- e.g. hitting /setup or /login while logged out
+// shows the matching screen in place, no client-side redirect needed.
+//
+// /containers and /endpoints are the two exceptions: each is also a public
+// demo entry point (Home.jsx's "Explorar demo" -- Docker Demo Lab and LXD
+// Linux Demo Lab respectively), so neither ever shows the forced
+// Login/Setup wall -- an anonymous visitor gets <Containers isVisitor>/
+// <Endpoints isVisitor> directly (they fetch the sanitized GET
+// /demo-snapshot / GET /demo-host-snapshot instead of the real, now-
+// authenticated /api/containers / /api/endpoints). `showAuthScreen` only
+// flips to true when the visitor clicks the discreet "Entrar" button in
+// either page's header -- that's the sole path to seeing Login/Setup on
+// these two routes.
 export default function App() {
   const path = window.location.pathname
   const isConsoleRoute = CONSOLE_PATHS.has(path)
+  const isContainersRoute = path === '/containers'
+  const isEndpointsRoute = path === '/endpoints'
 
   // null = ainda checando; {mode: 'setup'|'login'} = não autenticado;
   // {mode: 'authed', username} = sessão válida.
   const [authGate, setAuthGate] = useState(null)
+  const [showAuthScreen, setShowAuthScreen] = useState(false)
 
   useEffect(() => {
     if (!isConsoleRoute) return
@@ -70,6 +84,7 @@ export default function App() {
 
   function handleAuthenticated(username) {
     setAuthGate({ mode: 'authed', username })
+    setShowAuthScreen(false)
   }
 
   function handleLogout() {
@@ -80,18 +95,30 @@ export default function App() {
     <Suspense fallback={null}>
       {!isConsoleRoute && (path === '/demo' ? <Demo /> : <Home />)}
 
-      {isConsoleRoute && authGate?.mode === 'setup' && <Setup apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />}
-      {isConsoleRoute && authGate?.mode === 'login' && <Login apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />}
-      {isConsoleRoute && authGate?.mode === 'authed' && path === '/endpoints' && (
+      {isEndpointsRoute && showAuthScreen && authGate?.mode === 'setup' && (
+        <Setup apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />
+      )}
+      {isEndpointsRoute && showAuthScreen && authGate?.mode === 'login' && (
+        <Login apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />
+      )}
+      {isEndpointsRoute && authGate?.mode === 'authed' && (
         <Endpoints apiFetch={apiFetch} username={authGate.username} onLogout={handleLogout} />
       )}
-      {isConsoleRoute && authGate?.mode === 'authed' && path !== '/endpoints' && (
+      {isEndpointsRoute && authGate?.mode !== 'authed' && !(showAuthScreen && (authGate?.mode === 'setup' || authGate?.mode === 'login')) && (
+        <Endpoints apiFetch={apiFetch} isVisitor onRequestLogin={() => setShowAuthScreen(true)} />
+      )}
+
+      {isContainersRoute && showAuthScreen && authGate?.mode === 'setup' && (
+        <Setup apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />
+      )}
+      {isContainersRoute && showAuthScreen && authGate?.mode === 'login' && (
+        <Login apiFetch={apiFetch} onAuthenticated={handleAuthenticated} />
+      )}
+      {isContainersRoute && authGate?.mode === 'authed' && (
         <Containers apiFetch={apiFetch} username={authGate.username} onLogout={handleLogout} />
       )}
-      {isConsoleRoute && authGate?.mode === 'error' && (
-        <p style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-          Could not reach the Invariant API at {API_BASE}. Is it running?
-        </p>
+      {isContainersRoute && authGate?.mode !== 'authed' && !(showAuthScreen && (authGate?.mode === 'setup' || authGate?.mode === 'login')) && (
+        <Containers apiFetch={apiFetch} isVisitor onRequestLogin={() => setShowAuthScreen(true)} />
       )}
     </Suspense>
   )
