@@ -226,6 +226,20 @@
   font-weight: 600;
   font-size: 0.95rem;
 }
+.hero-tertiary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  color: rgba(255, 255, 255, 0.72);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+.hero-tertiary-action:hover {
+  color: #fff;
+}
 .hero-evidence {
   position: relative;
   margin-top: 3rem;
