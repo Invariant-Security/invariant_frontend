@@ -301,7 +301,7 @@ export default function Home() {
           <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
           <button onClick={() => scrollTo('mercado')}>Mercado</button>
           <button onClick={() => scrollTo('seguranca')}>Segurança</button>
-          <button onClick={() => scrollTo('planos')}>Falar com a gente</button>
+          <button onClick={() => scrollTo('contato')}>Falar com a gente</button>
           <a href="/nossa-historia">Nossa história</a>
           <a href="/containers">Explorar demo</a>
         </nav>
@@ -314,7 +314,7 @@ export default function Home() {
             <button onClick={() => scrollTo('como-funciona')}>Como funciona</button>
             <button onClick={() => scrollTo('mercado')}>Mercado</button>
             <button onClick={() => scrollTo('seguranca')}>Segurança</button>
-            <button onClick={() => scrollTo('planos')}>Falar com a gente</button>
+            <button onClick={() => scrollTo('contato')}>Falar com a gente</button>
             <a href="/nossa-historia">Nossa história</a>
             <a href="/containers">Explorar demo</a>
           </div>
@@ -337,7 +337,7 @@ export default function Home() {
               evidências e gera resultados auditáveis. A primeira baseline suportada é CIS.
             </p>
             <div className="hero-actions">
-              <button className="primary-action" onClick={() => scrollTo('planos')}>
+              <button className="primary-action" onClick={() => scrollTo('contato')}>
                 Falar com a gente <ArrowDownRight size={18} />
               </button>
               <a className="secondary-action" href="/containers">
@@ -588,7 +588,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="planos" className="content-section pricing-section">
+        <section id="contato" className="content-section pricing-section">
           <SectionHeader
             index="04"
             eyebrow="Fale com a Invariant"
@@ -602,7 +602,7 @@ export default function Home() {
                 <FileCheck2 size={16} /> DEPOIS DO ENVIO
               </div>
               <h3>Avaliamos seu cenário e voltamos com os próximos passos.</h3>
-              <p>Sem simulador de contrato por aqui -- o retorno é uma conversa sobre o seu ambiente e como o Invariant se aplica a ele.</p>
+              <p>O retorno é uma conversa sobre o seu ambiente e como o Invariant se aplica a ele.</p>
               <ul className="lead-info-list">
                 <li>
                   <CheckCircle2 size={16} /> CIS + Linux em demo pública de assessment
