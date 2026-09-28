@@ -29,14 +29,19 @@ export default function Privacidade() {
       <main className="legal-main">
         <p className="eyebrow">Documento legal</p>
         <h1>Política de Privacidade</h1>
-        <p className="legal-updated">Última atualização: 23 de setembro de 2026</p>
+        <p className="legal-updated">Última atualização: 28 de setembro de 2026</p>
 
         <section>
-          <h2>1. Controlador</h2>
+          <h2>1. Controlador e encarregado</h2>
           <p>
-            Esta política é mantida pela Invariant Security, responsável pelo tratamento dos dados pessoais
-            descritos aqui. <Pending>Razão social e endereço formais: a confirmar quando a empresa estiver
-            formalmente constituída.</Pending>
+            Esta política é mantida pela Invariant Security. Enquanto a empresa não estiver formalmente
+            constituída, o controlador dos dados pessoais descritos aqui é o seu fundador, Victor{' '}
+            <Pending>[nome completo]</Pending>, pessoa física. Quando a empresa for constituída, esta página será
+            atualizada com a razão social, o CNPJ e o endereço.
+          </p>
+          <p>
+            O encarregado pelo tratamento de dados pessoais (art. 41 da LGPD) também é o Victor, pelo e-mail{' '}
+            <a href="mailto:privacidade@invariantsec.org">privacidade@invariantsec.org</a>.
           </p>
         </section>
 
@@ -104,7 +109,25 @@ export default function Privacidade() {
               interno do Slack da nossa equipe, para que possamos responder rapidamente. O Slack atua como nosso
               operador nessa notificação.
             </li>
+            <li>
+              <strong>Hostinger</strong>: provedor do servidor onde o site, o banco de dados e os backups ficam
+              hospedados.
+            </li>
+            <li>
+              <strong>Cloudflare</strong>: todo o tráfego do site passa pela Cloudflare, que fornece a conexão
+              segura (HTTPS), proteção contra ataques e DNS. Ela recebe dados técnicos da conexão, como o endereço
+              IP.
+            </li>
+            <li>
+              <strong>Microsoft 365</strong>: nosso provedor de e-mail. Se você nos escrever, a mensagem fica
+              armazenada lá.
+            </li>
           </ul>
+          <p>
+            Alguns desses fornecedores armazenam ou processam dados fora do Brasil. Nesses casos, a transferência
+            internacional se apoia nas garantias contratuais e de proteção de dados oferecidas por cada um deles
+            (art. 33 da LGPD).
+          </p>
           <p>
             Não vendemos, alugamos ou compartilhamos seus dados com terceiros para fins de marketing de
             terceiros.
@@ -124,30 +147,51 @@ export default function Privacidade() {
         <section>
           <h2>8. Logs técnicos</h2>
           <p>
-            Como qualquer aplicação web, nossa infraestrutura gera logs técnicos de operação (registros de
-            requisições, por exemplo). O endereço IP de quem envia o formulário comercial é usado momentaneamente
-            para limitar o número de envios em um curto período (prevenção de abuso/spam) e não é gravado em
-            nosso banco de dados nem incluído na notificação enviada ao Slack.
+            Como qualquer aplicação web, nossa infraestrutura gera logs técnicos de operação, como registros de
+            acesso (endereço IP, data e hora, página acessada e navegador). Usamos esses registros para operar o
+            site, investigar falhas e nos proteger de abusos, com base no legítimo interesse (art. 7º, IX) e no
+            dever legal de guarda de registros de acesso (art. 15 do Marco Civil da Internet). O endereço IP de
+            quem envia o formulário comercial também é usado momentaneamente para limitar o número de envios em
+            um curto período (prevenção de abuso/spam) e não é gravado em nosso banco de dados nem incluído na
+            notificação enviada ao Slack.
           </p>
         </section>
 
         <section>
           <h2>9. Por quanto tempo guardamos seus dados</h2>
+          <ul>
+            <li>
+              <strong>Formulário comercial:</strong> até 24 meses após o último contato, se a conversa não evoluir
+              para um contrato. Depois disso, os dados são eliminados.
+            </li>
+            <li>
+              <strong>Newsletter:</strong> até você cancelar a inscrição ou retirar o consentimento.
+            </li>
+            <li>
+              <strong>Registros de acesso:</strong> 6 meses, prazo exigido pelo Marco Civil da Internet. Outros
+              logs técnicos: 30 dias.
+            </li>
+            <li>
+              <strong>Backups:</strong> cópias diárias guardadas por 30 dias e uma cópia mensal guardada por 12
+              meses. Um dado eliminado do sistema deixa de existir nos backups ao fim desses ciclos.
+            </li>
+          </ul>
           <p>
-            Hoje não temos um processo automático de exclusão por prazo fixo — os dados enviados permanecem
-            armazenados até que sejam apagados mediante solicitação sua (ver seção 11) ou por decisão nossa de
-            expurgo. Estamos avaliando definir um prazo de retenção formal; até lá, preferimos informar esse
-            estado real em vez de prometer um prazo que ainda não está implementado.
+            Você pode pedir a eliminação antes desses prazos a qualquer momento (ver seção 12), exceto quando a
+            lei exigir que um dado seja mantido.
           </p>
         </section>
 
         <section>
           <h2>10. Segurança</h2>
           <p>
-            Adotamos medidas técnicas razoáveis de proteção: conexão criptografada (HTTPS/TLS) em todo o site e
-            acesso restrito ao nosso banco de dados. Nenhuma medida de segurança é infalível — não garantimos
-            proteção absoluta contra qualquer incidente, mas trabalhamos para reduzir os riscos de forma
-            contínua.
+            Adotamos medidas técnicas razoáveis de proteção: conexão criptografada (HTTPS/TLS) em todo o site,
+            autenticação para as áreas administrativas, ambiente de testes isolado e sem dados reais, e avaliações
+            periódicas de segurança com um plano de correção acompanhado. Nenhuma medida de segurança é
+            infalível — não garantimos proteção absoluta contra qualquer incidente, mas trabalhamos para reduzir
+            os riscos de forma contínua. Se ocorrer um incidente de segurança que possa trazer risco ou dano
+            relevante a você, vamos comunicar você e a Autoridade Nacional de Proteção de Dados (ANPD), como
+            prevê o art. 48 da LGPD.
           </p>
         </section>
 
@@ -168,8 +212,10 @@ export default function Privacidade() {
         <section>
           <h2>12. Como exercer seus direitos</h2>
           <p>
-            Envie sua solicitação para <a href="mailto:victor@invariantsec.org">victor@invariantsec.org</a>. Vamos
-            responder dentro de um prazo razoável.
+            Envie sua solicitação para{' '}
+            <a href="mailto:privacidade@invariantsec.org">privacidade@invariantsec.org</a>. Respondemos pedidos de
+            confirmação e de acesso aos seus dados em até 15 dias (art. 19 da LGPD) e os demais pedidos no menor
+            prazo possível. Você também pode apresentar uma reclamação à ANPD.
           </p>
         </section>
 
