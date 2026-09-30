@@ -3,14 +3,8 @@ import './Legal.css'
 
 // Todo o conteúdo abaixo reflete uma auditoria real do código deste
 // repositório (frontend + invariant_api), não um texto genérico de
-// template -- ver o plano desta rodada pra cada achado citado aqui.
-// Trechos marcados com <Pending> são exatamente os pontos que o
-// código não pode determinar sozinho (CNPJ, endereço, canal de
-// contato dedicado) -- não são placeholders esquecidos, são a
-// sinalização explícita pedida: não inventar.
-function Pending({ children }) {
-  return <span className="legal-pending">{children}</span>
-}
+// template, e acompanha o ROPA/RIPD do projeto -- mudar um tratamento
+// de dados aqui sem mudar lá (ou vice-versa) deixa os dois divergentes.
 
 export default function Privacidade() {
   useDocumentLang('pt-BR')
@@ -35,12 +29,13 @@ export default function Privacidade() {
           <h2>1. Controlador e encarregado</h2>
           <p>
             Esta política é mantida pela Invariant Security. Enquanto a empresa não estiver formalmente
-            constituída, o controlador dos dados pessoais descritos aqui é o seu fundador, Victor{' '}
-            <Pending>[nome completo]</Pending>, pessoa física. Quando a empresa for constituída, esta página será
+            constituída, o controlador dos dados pessoais descritos aqui é o seu fundador, Victor Dias
+            Goncalves, pessoa física. Quando a empresa for constituída, esta página será
             atualizada com a razão social, o CNPJ e o endereço.
           </p>
           <p>
-            O encarregado pelo tratamento de dados pessoais (art. 41 da LGPD) também é o Victor, pelo e-mail{' '}
+            O encarregado pelo tratamento de dados pessoais (art. 41 da LGPD) também é Victor Dias Goncalves,
+            pelo e-mail{' '}
             <a href="mailto:privacidade@invariantsec.org">privacidade@invariantsec.org</a>.
           </p>
         </section>
