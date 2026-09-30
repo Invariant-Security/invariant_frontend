@@ -30,11 +30,11 @@ export default function Privacidade() {
           <p>
             Esta política é mantida pela Invariant Security. Enquanto a empresa não estiver formalmente
             constituída, o controlador dos dados pessoais descritos aqui é o seu fundador, Victor Dias
-            Goncalves, pessoa física. Quando a empresa for constituída, esta página será
+            Gonçalves, pessoa física. Quando a empresa for constituída, esta página será
             atualizada com a razão social, o CNPJ e o endereço.
           </p>
           <p>
-            O encarregado pelo tratamento de dados pessoais (art. 41 da LGPD) também é Victor Dias Goncalves,
+            O encarregado pelo tratamento de dados pessoais (art. 41 da LGPD) também é Victor Dias Gonçalves,
             pelo e-mail{' '}
             <a href="mailto:privacidade@invariantsec.org">privacidade@invariantsec.org</a>.
           </p>
@@ -106,7 +106,7 @@ export default function Privacidade() {
             </li>
             <li>
               <strong>Hostinger</strong>: provedor do servidor onde o site, o banco de dados e os backups ficam
-              hospedados.
+              hospedados. O servidor fica nos Estados Unidos.
             </li>
             <li>
               <strong>Cloudflare</strong>: todo o tráfego do site passa pela Cloudflare, que fornece a conexão
@@ -119,8 +119,8 @@ export default function Privacidade() {
             </li>
           </ul>
           <p>
-            Alguns desses fornecedores armazenam ou processam dados fora do Brasil. Nesses casos, a transferência
-            internacional se apoia nas garantias contratuais e de proteção de dados oferecidas por cada um deles
+            Por isso, os dados que você nos envia são armazenados fora do Brasil, e alguns dos demais fornecedores
+            também os processam no exterior. Essa transferência internacional se apoia nas garantias contratuais e de proteção de dados oferecidas por cada um deles
             (art. 33 da LGPD).
           </p>
           <p>
