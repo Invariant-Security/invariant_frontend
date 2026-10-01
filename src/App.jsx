@@ -50,8 +50,14 @@ async function apiFetch(path, options = {}) {
 // flips to true when the visitor clicks the discreet "Entrar" button in
 // either page's header -- that's the sole path to seeing Login/Setup on
 // these two routes.
+// "/arquitetura/" e "/arquitetura" são a mesma página -- sem isso, a barra
+// final caía na home.
+export function normalizePath(pathname) {
+  return pathname.replace(/\/+$/, '') || '/'
+}
+
 export default function App() {
-  const path = window.location.pathname
+  const path = normalizePath(window.location.pathname)
   const isConsoleRoute = CONSOLE_PATHS.has(path)
   const isContainersRoute = path === '/containers'
   const isEndpointsRoute = path === '/endpoints'
