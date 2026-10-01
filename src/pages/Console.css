@@ -413,3 +413,15 @@ h2 {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* Impressão digital do certificado do appliance (TlsFingerprint.jsx). */
+.tls-fingerprint {
+  margin: -0.5rem 0 1.25rem;
+  font-size: 0.78rem;
+  color: var(--sub);
+}
+
+.tls-fingerprint code {
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}

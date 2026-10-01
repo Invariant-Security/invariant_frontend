@@ -4,6 +4,7 @@ import { FindingsReport, FindingDetail } from '../findings.jsx'
 import { formatOsDisplayFromParts, formatTargetLabel } from '../targetLabel.js'
 import './Console.css'
 import './Findings.css'
+import TlsFingerprint from '../components/TlsFingerprint.jsx'
 
 // Overridable via VITE_API_BASE, same convention as Home.jsx/Demo.jsx --
 // VisitorContainers usa isso pra montar link direto pro GET público
@@ -563,6 +564,7 @@ function AdminContainers({ apiFetch, username, onLogout }) {
           </button>
         </div>
       </header>
+      <TlsFingerprint apiFetch={apiFetch} />
 
       {error && (
         <p className="error" style={{ marginBottom: '1rem' }}>
