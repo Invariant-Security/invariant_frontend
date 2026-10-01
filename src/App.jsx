@@ -10,6 +10,7 @@ const Historia = lazy(() => import('./pages/Historia.jsx'))
 const Privacidade = lazy(() => import('./pages/Privacidade.jsx'))
 const Cookies = lazy(() => import('./pages/Cookies.jsx'))
 const Termos = lazy(() => import('./pages/Termos.jsx'))
+const Arquitetura = lazy(() => import('./pages/Arquitetura.jsx'))
 const Setup = lazy(() => import('./pages/Setup.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Endpoints = lazy(() => import('./pages/Endpoints.jsx'))
@@ -108,6 +109,8 @@ export default function App() {
           <Cookies />
         ) : path === '/termos' ? (
           <Termos />
+        ) : path === '/arquitetura' ? (
+          <Arquitetura />
         ) : (
           <Home />
         ))}

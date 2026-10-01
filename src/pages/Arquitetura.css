@@ -1,0 +1,78 @@
+/* Só a página /arquitetura. Reaproveita a família visual das páginas
+   jurídicas (Legal.css: tokens, header, footer) e alarga a coluna, porque
+   diagramas precisam de mais espaço que texto corrido. */
+
+.legal-main.arq-main {
+  max-width: 64rem;
+}
+
+.legal-main p.arq-lead {
+  margin: 0.75rem 0 0;
+  font-size: 1.05rem;
+  max-width: 44rem;
+}
+
+.arq-diagram {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1.25rem;
+  overflow-x: auto;
+}
+
+.arq-svg svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.arq-source {
+  margin: 0;
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  white-space: pre;
+}
+
+.arq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: 0.85rem;
+}
+
+.arq-grid-2 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  max-width: 48rem;
+}
+
+.arq-card {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  min-width: 0;
+}
+
+.legal-main .arq-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.98rem;
+  color: var(--ink);
+}
+
+.legal-main .arq-card p {
+  margin: 0;
+  font-size: 0.93rem;
+}
+
+.legal-main .arq-card p.arq-stack {
+  margin-bottom: 0.4rem;
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+.arq-card code {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 0.9em;
+}
