@@ -23,7 +23,7 @@ export default function Privacidade() {
       <main className="legal-main">
         <p className="eyebrow">Documento legal</p>
         <h1>Política de Privacidade</h1>
-        <p className="legal-updated">Última atualização: 28 de setembro de 2026</p>
+        <p className="legal-updated">Última atualização: 5 de outubro de 2026</p>
 
         <section>
           <h2>1. Controlador e encarregado</h2>
@@ -163,12 +163,13 @@ export default function Privacidade() {
               <strong>Newsletter:</strong> até você cancelar a inscrição ou retirar o consentimento.
             </li>
             <li>
-              <strong>Registros de acesso:</strong> 6 meses, prazo exigido pelo Marco Civil da Internet. Outros
-              logs técnicos: 30 dias.
+              <strong>Registros de acesso e demais logs técnicos:</strong> guardados por pelo menos 6 meses, prazo
+              mínimo exigido pelo Marco Civil da Internet. Hoje ainda não há exclusão automática depois desse
+              prazo.
             </li>
             <li>
-              <strong>Backups:</strong> cópias diárias guardadas por 30 dias e uma cópia mensal guardada por 12
-              meses. Um dado eliminado do sistema deixa de existir nos backups ao fim desses ciclos.
+              <strong>Backups:</strong> cópias diárias guardadas por 14 dias, no mesmo servidor do site. Não há
+              cópia mensal. Um dado eliminado do sistema deixa de existir nos backups ao fim desse ciclo.
             </li>
           </ul>
           <p>
